@@ -15,7 +15,7 @@ const fileReader = (fileName, fileNameRaw) => {
 	console.assert(fileName, 'Invalid argument');
 
 	const baseDir = path.parse(process.argv[2]).dir;
-	if (/^[\x20-\x7E]*$/.test(fileName)) {
+	if (/^[\x20-\x7E]*$/u.test(fileName)) {
 		return readFileAsync(path.join(baseDir, fileName));
 
 	} else if (fileNameRaw) {
@@ -23,7 +23,7 @@ const fileReader = (fileName, fileNameRaw) => {
 		return readFileAsync(path.join(baseDir, fileNameCP932));
 
 	} else {
-		return Promise.reject();
+		return Promise.reject(new Error('File not found'));
 	}
 };
 

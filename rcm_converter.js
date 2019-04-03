@@ -1,12 +1,13 @@
 // Settings	(TODO: Can be specified from users)
 const defaultSettings = {
-	maxLoopNestLevel: 5,
-	loopNumChangedFromInfLoop: 2,
+	maxLoopNestLevel:           5,
+	loopNumChangedFromInfLoop:  2,
 	thresholdBeatNumOfLoopBomb: 4000,
+
 	initialRolDevDeviceId: 0x10,
-	initialRolDevModelId: 0x16,
+	initialRolDevModelId:  0x16,
 	initialYamDevDeviceId: 0x10,
-	initialYamDevModelId: 0x16,
+	initialYamDevModelId:  0x16,
 };
 
 export async function rcm2smf(buf, controlFileReader) {
@@ -43,7 +44,7 @@ export async function parseRCM(buf, controlFileReader) {
 		if (rcm.header[name] && rcm.header[name].length > 0) {
 			const fileName = String.fromCodePoint(...rcm.header[name]);
 			if (controlFileReader) {
-				rcm.header[data] = await controlFileReader(fileName, (/^[\x20-\x7E]*$/.test(fileName)) ? undefined : rcm.header[name]).catch((e) => {
+				rcm.header[data] = await controlFileReader(fileName, (/^[\x20-\x7E]*$/u.test(fileName)) ? undefined : rcm.header[name]).catch((e) => {
 					console.error(`Not found: ${fileName}`, e);
 				});
 			} else {
@@ -279,7 +280,7 @@ function convertCM6ToSysEx(buf) {
 	return sysExs;
 
 	function makeSysEx(bytes, addrH, addrM, addrL) {
-		console.assert([addrH, addrM, addrL].every((e) => 0x00 <= e && e < 0x80), 'Invalid address', {addrH, addrM, addrL});
+		console.assert([addrH, addrM, addrL].every((e) => (0x00 <= e && e < 0x80)), 'Invalid address', {addrH, addrM, addrL});
 		const sysEx = [0xf0, 0x41, 0x10, 0x16, 0x12, addrH, addrM, addrL, ...bytes, 0, 0xf7];
 		sysEx[sysEx.length - 2] = checkSum(sysEx.slice(5, -2));
 		return sysEx;
@@ -323,7 +324,7 @@ function convertGSDToSysEx(buf) {
 	for (let i = 0; i < 16; i++) {
 		const index = 0x0036 + i * 0x7a;
 		const bytes = buf.slice(index, index + 0x7a);
-		let addr = 0x90 + 0xe0 * [1, 2, 3, 4, 5, 6, 7, 8, 9, 0, 10, 11, 12, 13, 14, 15][i];
+		const addr = 0x90 + 0xe0 * [1, 2, 3, 4, 5, 6, 7, 8, 9, 0, 10, 11, 12, 13, 14, 15][i];
 		sysExs.push(...makeSysExsForPatch(bytes, 0x48, addr >> 7, addr & 0x7f));
 	}
 
@@ -361,14 +362,14 @@ function convertGSDToSysEx(buf) {
 	}
 
 	function makeSysEx(bytes, addrH, addrM, addrL) {
-		console.assert([addrH, addrM, addrL].every((e) => 0x00 <= e && e < 0x80), 'Invalid address', {addrH, addrM, addrL});
+		console.assert([addrH, addrM, addrL].every((e) => (0x00 <= e && e < 0x80)), 'Invalid address', {addrH, addrM, addrL});
 		const sysEx = [0xf0, 0x41, 0x10, 0x42, 0x12, addrH, addrM, addrL, ...bytes, 0, 0xf7];
 		sysEx[sysEx.length - 2] = checkSum(sysEx.slice(5, -2));
 		return sysEx;
 	}
 
 	function makeSysExsForPatch(bytes, addrH, addrM, addrL) {
-		console.assert([addrH, addrM, addrL].every((e) => 0x00 <= e && e < 0x80), 'Invalid address', {addrH, addrM, addrL});
+		console.assert([addrH, addrM, addrL].every((e) => (0x00 <= e && e < 0x80)), 'Invalid address', {addrH, addrM, addrL});
 
 		const nibbles = [];
 
@@ -426,7 +427,7 @@ function convertGSDToSysEx(buf) {
 			nibbles.push(...nibblize(...bytes.slice(index, index + 3)), 0, 0, ...nibblize(...bytes.slice(index + 3, index + 11)));
 		}
 		console.assert(nibbles.length === 224, {nibbles});
-		console.assert(nibbles.every((e) => 0x0 <= e && e < 0x10), 'Invalid SysEx nibble', {nibbles});
+		console.assert(nibbles.every((e) => (0x0 <= e && e < 0x10)), 'Invalid SysEx nibble', {nibbles});
 
 		// Divides the whole data by 2 packets.
 		return [0, 1].map((i) => {
@@ -522,7 +523,7 @@ function extractEvents(events, timeBase) {
 					}
 
 					// Checks whether it would be a "loop bomb" and revises the number of loops if necessary.
-					const beatNum = extractedEvents.slice(lastStack.extractedIndex).reduce((p, c) => (c[0] <= 0xf5) ? p + c[1] : p, 0) / timeBase;
+					const beatNum = extractedEvents.slice(lastStack.extractedIndex).reduce((p, c) => ((c[0] <= 0xf5) ? p + c[1] : p), 0) / timeBase;
 					if (beatNum * lastStack.count >= defaultSettings.thresholdBeatNumOfLoopBomb && lastStack.count > defaultSettings.loopNumChangedFromInfLoop) {
 						console.warn(`Detected a loop bomb. Set number of loops to ${defaultSettings.loopNumChangedFromInfLoop}.`);
 						lastStack.count = defaultSettings.loopNumChangedFromInfLoop;
@@ -551,7 +552,7 @@ function extractEvents(events, timeBase) {
 			if (stacks.length > 0) {
 				console.warn(`Detected ${stacks.length}-level of unclosed loop. Ignored.`);
 			}
-			/*FALLTHRU*/
+			/* FALLTHRU */
 		case 0xfd:	// Measure End
 			if (lastIndex >= 0) {
 				index = lastIndex + 1;
@@ -575,7 +576,7 @@ function extractEvents(events, timeBase) {
 				}
 
 				// Trims trailing 0xf7.
-				const end = String.fromCodePoint(...concattedEvent).replace(/\xf7+$/, '').length;
+				const end = String.fromCodePoint(...concattedEvent).replace(/\xf7+$/u, '').length;
 				extractedEvents.push(concattedEvent.slice(0, end));
 			}
 			break;
@@ -614,7 +615,7 @@ function extractEvents(events, timeBase) {
 			return [...bytes];
 		} else if (bytes[0] === 0xfc) {
 			const measure = bytes[2] | (bytes[3] << 8);
-			const offset = (bytes[4] | bytes[5] << 8) * 6 - 0xf2;
+			const offset = (bytes[4] | (bytes[5] << 8)) * 6 - 0xf2;
 			return [bytes[0], measure, offset];
 		} else {
 			return [bytes[0], bytes[2] | (bytes[3] << 8), bytes[4] | (bytes[5] << 8), bytes[1]];
@@ -622,11 +623,11 @@ function extractEvents(events, timeBase) {
 	}
 }
 
-function calcSetupMeasureLength(beatN, beatD, timeBase/*, minTick = 0*/) {	// TODO: Consider minTick 
+function calcSetupMeasureLength(beatN, beatD, timeBase/* , minTick = 0 */) {	// TODO: Consider minTick
 	console.assert(Number.isInteger(Math.log2(beatD)), 'Invalid argument', {beatD});
 
 	if ((beatN === 3 && beatD === 4) || (beatN === 6 && beatD === 8)) {
-		return timeBase * 3;	// special case
+		return timeBase * 3;	// Special case
 	}
 
 	const unit = timeBase * 4 / beatD;
@@ -646,7 +647,7 @@ function spaceEachSysEx(sysExs, totalTick, timeBase) {
 
 	// Calculates each tick time from the ratio of the size of each SysEx to the total size of SysEx.
 	const totalBytes = sysExs.reduce((p, c) => p + c.length, 0);
-	let timings = sysExs.map((sysEx) => {
+	const timings = sysExs.map((sysEx) => {
 		const tick = Math.max(Math.trunc(sysEx.length * totalTick / totalBytes), 1);
 		const usecPerBeat = getUsecPerBeat(sysEx.length, tick);
 		return {sysEx, tick, usecPerBeat};
@@ -833,7 +834,7 @@ function convertRcmToSeq(rcm) {
 					throwUnless7bit(gt, vel);
 					setSeq(smfTrack.seq, timestamp, makeSysEx(event.slice(4), midiCh, gt, vel));
 					break;
-				
+
 				// MIDI messages
 				case 0xe1:	// BankPrgL (LSB)
 				case 0xe2:	// BankPrg  (MSB)
@@ -906,7 +907,7 @@ function convertRcmToSeq(rcm) {
 				case 0xd3:	// XGPara
 					throwUnless7bit(gt, vel);
 					yamDev = [0x10, 0x4c];	// Note: Is it really OK to overwrite YamDev#?
-					/*FALLTHRU*/
+					/* FALLTHRU */
 				case 0xd2:	// YamPara
 					throwUnless7bit(gt, vel);
 					{
@@ -1112,7 +1113,7 @@ function convertRcmToSeq(rcm) {
 
 	function throwUnless7bit(...values) {
 		console.assert(values && values.length, 'Invalid argument', {values});
-		if (values.some((e) => !Number.isInteger(e) || e < 0 || 0x80 <= e)) {
+		if (values.some((e) => !Number.isInteger(e) || (e < 0 || 0x80 <= e))) {
 			throw new Error(`Invalid value ${values}`);
 		}
 	}
@@ -1155,6 +1156,9 @@ function convertRcmToSeq(rcm) {
 				break;
 			case 0xf7:
 				break loop;
+			default:
+				throwUnless7bit(byte);
+				break;
 			}
 			throwUnless7bit(value);
 
@@ -1171,7 +1175,7 @@ function convertRcmToSeq(rcm) {
 	}
 
 	function makeText(kind, bytes) {
-		console.assert(0x01 <= kind && kind <= 0x0f, 'Invalid argument', {kind});
+		console.assert((0x01 <= kind && kind <= 0x0f), 'Invalid argument', {kind});
 		console.assert(bytes && 'length' in bytes, 'Invalid argument', {bytes});
 		return [0xff, kind, ...varNum(bytes.length), ...bytes];
 	}
@@ -1253,20 +1257,20 @@ function checkSum(bytes) {
 }
 
 function varNum(value) {
-	console.assert(Number.isInteger(value) && 0 <= value && value < 0x10000000, 'Invalid argument', {value});
+	console.assert(Number.isInteger(value) && (0 <= value && value < 0x10000000), 'Invalid argument', {value});
 	if (value < 0x80) {
 		return [value];
 	} else if (value < 0x4000) {
 		return [(value >> 7) | 0x80, value & 0x7f];
 	} else if (value < 0x200000) {
-		return [(value >> 14) | 0x80, (value >> 7) & 0x7f | 0x80, value & 0x7f];
+		return [(value >> 14) | 0x80, ((value >> 7) & 0x7f) | 0x80, value & 0x7f];
 	} else {
-		return [(value >> 21) | 0x80, (value >> 14) & 0x7f | 0x80, (value >> 7) & 0x7f | 0x80, value & 0x7f];
+		return [(value >> 21) | 0x80, ((value >> 14) & 0x7f) | 0x80, ((value >> 7) & 0x7f) | 0x80, value & 0x7f];
 	}
 }
 
 function strToBytes(str) {
-	console.assert(typeof str === 'string' && /^[\x20-\x7E]*$/.test(str), 'Invalid argument', {str});
+	console.assert(typeof str === 'string' && /^[\x20-\x7E]*$/u.test(str), 'Invalid argument', {str});
 	return str.split('').map((e) => e.codePointAt(0));
 }
 
@@ -1278,7 +1282,7 @@ function rawTrim(buf) {
 	}
 
 	const begin = buf.findIndex((e) => e !== 0x20);
-	const end = String.fromCodePoint(...buf).replace(/\x20+$/, '').length;
+	const end = String.fromCodePoint(...buf).replace(/\x20+$/u, '').length;
 	console.assert(begin < end);
 
 	return buf.slice(begin, end);
