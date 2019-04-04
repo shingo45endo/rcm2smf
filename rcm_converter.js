@@ -65,8 +65,7 @@ function parseRCP(buf) {
 	console.assert(buf && buf.length, 'Invalid argument', {buf});
 
 	// Checks the file header.
-	if (buf.length < 518 ||
-		!String.fromCharCode(...buf.slice(0x0000, 0x0020)).startsWith('RCM-PC98V2.0(C)COME ON MUSIC')) {
+	if (buf.length < 518 || !String.fromCharCode(...buf.slice(0x0000, 0x0020)).startsWith('RCM-PC98V2.0(C)COME ON MUSIC')) {
 		return null;
 	}
 
@@ -113,7 +112,7 @@ function parseRCP(buf) {
 
 		// Track Header
 		const size = view.getUint16(index, true);
-		if (size < HEADER_LENGTH ||  index + size > buf.length) {
+		if (size < HEADER_LENGTH || index + size > buf.length) {
 			console.warn(`Invalid track size: ${size}`);
 			break;
 		}
@@ -146,8 +145,7 @@ function parseG36(buf) {
 	console.assert(buf && buf.length, 'Invalid argument', {buf});
 
 	// Checks the file header.
-	if (buf.length < 518 ||
-		!String.fromCharCode(...buf.slice(0x0000, 0x0020)).startsWith('COME ON MUSIC RECOMPOSER RCP3.0')) {
+	if (buf.length < 518 || !String.fromCharCode(...buf.slice(0x0000, 0x0020)).startsWith('COME ON MUSIC RECOMPOSER RCP3.0')) {
 		return null;
 	}
 
@@ -192,7 +190,7 @@ function parseG36(buf) {
 
 		// Track Header
 		const size = view.getUint32(index, true);
-		if (size < HEADER_LENGTH ||  index + size > buf.length) {
+		if (size < HEADER_LENGTH || index + size > buf.length) {
 			console.warn(`Invalid track size: ${size}`);
 			break;
 		}
@@ -225,8 +223,8 @@ function convertCM6ToSysEx(buf) {
 
 	// Checks the file header.
 	if (buf.length < 0x5843 ||
-		!String.fromCharCode(...buf.slice(0x0000, 0x000d)).startsWith('COME ON MUSIC') ||
-		!String.fromCharCode(...buf.slice(0x0010, 0x001a)).startsWith('R ')) {
+	    !String.fromCharCode(...buf.slice(0x0000, 0x000d)).startsWith('COME ON MUSIC') ||
+	    !String.fromCharCode(...buf.slice(0x0010, 0x001a)).startsWith('R ')) {
 		return null;
 	}
 
@@ -292,8 +290,8 @@ function convertGSDToSysEx(buf) {
 
 	// Checks the file header.
 	if (buf.length < 0x0a71 ||
-		!String.fromCharCode(...buf.slice(0x0000, 0x000d)).startsWith('COME ON MUSIC') ||
-		!String.fromCharCode(...buf.slice(0x000e, 0x001c)).startsWith('GS CONTROL 1.0')) {
+	    !String.fromCharCode(...buf.slice(0x0000, 0x000d)).startsWith('COME ON MUSIC') ||
+	    !String.fromCharCode(...buf.slice(0x000e, 0x001c)).startsWith('GS CONTROL 1.0')) {
 		return null;
 	}
 

@@ -39,6 +39,8 @@
 				"allowSamePrecedence": true
 			}
 		],
+		"no-mixed-spaces-and-tabs": ["error", "smart-tabs"],
+		"no-use-before-define": ["error", "nofunc"],
 		"prefer-destructuring": ["error",
 			{
 				"VariableDeclarator": {
@@ -95,7 +97,6 @@
 		"no-tabs": "off",
 		"no-ternary": "off",
 		"no-undefined": "off",
-		"no-use-before-define": "off",
 		"object-curly-newline": "off",
 		"object-property-newline": "off",
 		"one-var": "off",
