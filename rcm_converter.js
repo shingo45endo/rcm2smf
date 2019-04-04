@@ -234,7 +234,7 @@ function convertCM6ToSysEx(buf) {
 	// System Area
 	sysExs.push(makeSysEx(buf.slice(0x0080, 0x0098), 0x10, 0x00, 0x00));
 
-	// Timble Memory (#1 - #64)
+	// Timbre Memory (#1 - #64)
 	for (let i = 0; i < 64; i++) {
 		const index = 0x0e34 + i * 0x100;
 		sysExs.push(makeSysEx(buf.slice(index, index + 0x100), 0x08, i * 2, 0x00));
@@ -247,7 +247,7 @@ function convertCM6ToSysEx(buf) {
 	// Patch Temporary Area
 	sysExs.push(makeSysEx(buf.slice(0x00a0, 0x0130), 0x03, 0x00, 0x00));
 
-	// Timble Temporary Area
+	// Timbre Temporary Area
 	for (let i = 0; i < 8; i++) {
 		const addr = i * 0xf6;
 		const index = 0x0284 + addr;
