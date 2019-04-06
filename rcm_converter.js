@@ -53,8 +53,13 @@ export async function parseRCM(buf, controlFileReader) {
 		}
 	}
 
-	// Extracts same measures and loops.
+	// Executes post-processing for each track.
 	for (const track of rcm.tracks) {
+		// Sets MIDI channel No. and port No.
+		track.chNo   = (track.midiCh >= 0) ? track.midiCh % 16 : -1;
+		track.portNo = (track.midiCh >= 0) ? Math.trunc(track.midiCh / 16) : 0;
+
+		// Extracts same measures and loops.
 		track.extractedEvents = extractEvents(track.events, rcm.header.timeBase);
 	}
 
@@ -118,7 +123,7 @@ function parseRCP(buf) {
 		}
 
 		track.trackNo  = view.getUint8(index + 2);
-		track.midiCh   = view.getUint8(index + 4);
+		track.midiCh   = view.getInt8(index + 4);
 		track.keyShift = view.getUint8(index + 5);
 		const stShift = (rcm.header.isF) ? view.getInt8(index + 6) : view.getUint8(index + 6);
 		track.stShift = (stShift < 100) ? stShift : view.getInt8(index + 6);
@@ -196,7 +201,7 @@ function parseG36(buf) {
 		}
 
 		track.trackNo  = view.getUint8(index + 4);
-		track.midiCh   = view.getUint8(index + 6);
+		track.midiCh   = view.getInt8(index + 6);
 		track.keyShift = view.getUint8(index + 7);
 		track.stShift  = view.getInt8(index + 8);
 		track.mode     = view.getUint8(index + 9);
@@ -769,6 +774,7 @@ function convertRcmToSeq(rcm) {
 	setSeq(conductorTrack.seq, baseTime, makeTempo(60 * 1000 * 1000 / rcm.header.tempo));
 
 	// Converts each track.
+	const isAllPortSame = ((new Set(rcm.tracks.map((e) => e.portNo))).size === 1);
 	let maxDuration = 0;
 	for (const rcmTrack of rcm.tracks) {
 		// Skips the track if it is empty or muted.
@@ -782,11 +788,16 @@ function convertRcmToSeq(rcm) {
 		const noteGts = new Array(128).fill(0);
 		const keyShift = ((rcmTrack.keyShift & 0x80) !== 0) ? 0 : rcm.header.playBias + rcmTrack.keyShift - ((rcmTrack.keyShift >= 0x40) ? 0x80 : 0);
 		let timestamp = baseTime + rcmTrack.stShift;
-		let midiCh = (rcmTrack.midiCh) % 16;	// TODO: Support >16ch
+		let {chNo, portNo} = rcmTrack;
 		let rolDev, rolBase, yamDev, yamBase;	// TODO: Investigate whether they belong to track or global.
 
 		// Track Name
 		setSeq(smfTrack.seq, 0, makeText(0x03, rawTrim(rcmTrack.memo)));
+
+		// If any port No. are not same among all the track, adds an unofficial MIDI Port meta event. (0x21)
+		if (!isAllPortSame) {
+			setSeq(smfTrack.seq, 0, [0xff, 0x21, 0x01, portNo]);
+		}
 
 		// Converts each RCM event to MIDI/SysEx/meta event.
 		for (const event of rcmTrack.extractedEvents) {
@@ -801,7 +812,7 @@ function convertRcmToSeq(rcm) {
 						// Note on or Tie
 						console.assert(noteGts[noteNo] >= 0);
 						if (noteGts[noteNo] === 0) {
-							setSeq(smfTrack.seq, timestamp, [0x90 | midiCh, noteNo, vel]);
+							setSeq(smfTrack.seq, timestamp, [0x90 | chNo, noteNo, vel]);
 						}
 						noteGts[noteNo] = gt;
 					} else {
@@ -825,12 +836,12 @@ function convertRcmToSeq(rcm) {
 					{
 						const {bytes, memo} = rcm.header.userSysExs[cmd - 0x90];
 						setSeq(smfTrack.seq, timestamp, makeText(0x01, rawTrim(memo)));
-						setSeq(smfTrack.seq, timestamp, makeSysEx(bytes, midiCh, gt, vel));
+						setSeq(smfTrack.seq, timestamp, makeSysEx(bytes, chNo, gt, vel));
 					}
 					break;
 				case 0x98:	// Tr.Excl
 					throwUnless7bit(gt, vel);
-					setSeq(smfTrack.seq, timestamp, makeSysEx(event.slice(4), midiCh, gt, vel));
+					setSeq(smfTrack.seq, timestamp, makeSysEx(event.slice(4), chNo, gt, vel));
 					break;
 
 				// MIDI messages
@@ -839,29 +850,29 @@ function convertRcmToSeq(rcm) {
 					// Note: According to the MIDI spec, Bank Select must be transmitted as a pair of MSB and LSB.
 					// But, a BankPrg event is converted to a single MSB or LSB at the current implementation.
 					throwUnless7bit(gt, vel);
-					setSeq(smfTrack.seq, timestamp, [0xb0 | midiCh, (cmd === 0xe2) ? 0 : 32, vel]);
-					setSeq(smfTrack.seq, timestamp, [0xc0 | midiCh, gt]);
+					setSeq(smfTrack.seq, timestamp, [0xb0 | chNo, (cmd === 0xe2) ? 0 : 32, vel]);
+					setSeq(smfTrack.seq, timestamp, [0xc0 | chNo, gt]);
 					break;
 
 				case 0xea:	// AFTER C.
 					throwUnless7bit(gt);
-					setSeq(smfTrack.seq, timestamp, [0xd0 | midiCh, gt]);
+					setSeq(smfTrack.seq, timestamp, [0xd0 | chNo, gt]);
 					break;
 				case 0xeb:	// CONTROL
 					throwUnless7bit(gt, vel);
-					setSeq(smfTrack.seq, timestamp, [0xb0 | midiCh, gt, vel]);
+					setSeq(smfTrack.seq, timestamp, [0xb0 | chNo, gt, vel]);
 					break;
 				case 0xec:	// PROGRAM
 					throwUnless7bit(gt);
-					setSeq(smfTrack.seq, timestamp, [0xc0 | midiCh, gt]);
+					setSeq(smfTrack.seq, timestamp, [0xc0 | chNo, gt]);
 					break;
 				case 0xed:	// AFTER K.
 					throwUnless7bit(gt, vel);
-					setSeq(smfTrack.seq, timestamp, [0xa0 | midiCh, gt, vel]);
+					setSeq(smfTrack.seq, timestamp, [0xa0 | chNo, gt, vel]);
 					break;
 				case 0xee:	// PITCH
 					throwUnless7bit(gt, vel);
-					setSeq(smfTrack.seq, timestamp, [0xe0 | midiCh, gt, vel]);
+					setSeq(smfTrack.seq, timestamp, [0xe0 | chNo, gt, vel]);
 					break;
 
 				// 1-byte DT1 SysEx for Roland devices
@@ -889,7 +900,7 @@ function convertRcmToSeq(rcm) {
 						// Makes a SysEx by UsrExcl/Tr.Excl parser.
 						const bytes = [0x41, ...rolDev, 0x12, 0x83, ...rolBase, 0x80, 0x81, 0x84];
 						console.assert(bytes.length === 10);
-						setSeq(smfTrack.seq, timestamp, makeSysEx(bytes, midiCh, gt, vel));
+						setSeq(smfTrack.seq, timestamp, makeSysEx(bytes, chNo, gt, vel));
 					}
 					break;
 
@@ -928,9 +939,17 @@ function convertRcmToSeq(rcm) {
 
 				// Meta events
 				case 0xe6:	// MIDI CH.
-					// TODO: Support >16ch
 					if (0 < gt && gt <= 32) {
-						midiCh = (gt - 1) % 16;
+						const oldPortNo = portNo;
+						const midiCh = gt - 1;	// The internal representations of MIDI CH. are different between track headers and event.
+						chNo   = (midiCh >= 0) ? midiCh % 16 : -1;
+						portNo = (midiCh >= 0) ? Math.trunc(midiCh / 16) : portNo;
+
+						// Adds an unofficial MIDI Port meta event if necessary.
+						if (portNo !== oldPortNo) {
+							// TODO: Investigate whether this event can be appeared in the song body.
+							setSeq(smfTrack.seq, timestamp, [0xff, 0x21, 0x01, portNo]);
+						}
 					}
 					break;
 
@@ -1085,7 +1104,7 @@ function convertRcmToSeq(rcm) {
 				}
 
 				if (noteGt <= st) {
-					setSeq(smfTrack.seq, timestamp + noteGt, [0x90 | midiCh, noteNo, 0]);
+					setSeq(smfTrack.seq, timestamp + noteGt, [0x90 | chNo, noteNo, 0]);
 					noteGts[noteNo] = 0;
 				} else {
 					noteGts[noteNo] -= st;
