@@ -806,7 +806,7 @@ function convertRcmToSeq(rcm) {
 
 			if (cmd < 0x80) {
 				// Note event
-				if (gt > 0 && vel > 0) {
+				if (chNo >= 0 && gt > 0 && vel > 0) {
 					const noteNo = cmd + keyShift;
 					if (0 <= noteNo && noteNo < 0x80) {
 						// Note on or Tie
@@ -849,30 +849,42 @@ function convertRcmToSeq(rcm) {
 				case 0xe2:	// BankPrg  (MSB)
 					// Note: According to the MIDI spec, Bank Select must be transmitted as a pair of MSB and LSB.
 					// But, a BankPrg event is converted to a single MSB or LSB at the current implementation.
-					throwUnless7bit(gt, vel);
-					setSeq(smfTrack.seq, timestamp, [0xb0 | chNo, (cmd === 0xe2) ? 0 : 32, vel]);
-					setSeq(smfTrack.seq, timestamp, [0xc0 | chNo, gt]);
+					if (chNo >= 0) {
+						throwUnless7bit(gt, vel);
+						setSeq(smfTrack.seq, timestamp, [0xb0 | chNo, (cmd === 0xe2) ? 0 : 32, vel]);
+						setSeq(smfTrack.seq, timestamp, [0xc0 | chNo, gt]);
+					}
 					break;
 
 				case 0xea:	// AFTER C.
-					throwUnless7bit(gt);
-					setSeq(smfTrack.seq, timestamp, [0xd0 | chNo, gt]);
+					if (chNo >= 0) {
+						throwUnless7bit(gt);
+						setSeq(smfTrack.seq, timestamp, [0xd0 | chNo, gt]);
+					}
 					break;
 				case 0xeb:	// CONTROL
-					throwUnless7bit(gt, vel);
-					setSeq(smfTrack.seq, timestamp, [0xb0 | chNo, gt, vel]);
+					if (chNo >= 0) {
+						throwUnless7bit(gt, vel);
+						setSeq(smfTrack.seq, timestamp, [0xb0 | chNo, gt, vel]);
+					}
 					break;
 				case 0xec:	// PROGRAM
-					throwUnless7bit(gt);
-					setSeq(smfTrack.seq, timestamp, [0xc0 | chNo, gt]);
+					if (chNo >= 0) {
+						throwUnless7bit(gt);
+						setSeq(smfTrack.seq, timestamp, [0xc0 | chNo, gt]);
+					}
 					break;
 				case 0xed:	// AFTER K.
-					throwUnless7bit(gt, vel);
-					setSeq(smfTrack.seq, timestamp, [0xa0 | chNo, gt, vel]);
+					if (chNo >= 0) {
+						throwUnless7bit(gt, vel);
+						setSeq(smfTrack.seq, timestamp, [0xa0 | chNo, gt, vel]);
+					}
 					break;
 				case 0xee:	// PITCH
-					throwUnless7bit(gt, vel);
-					setSeq(smfTrack.seq, timestamp, [0xe0 | chNo, gt, vel]);
+					if (chNo >= 0) {
+						throwUnless7bit(gt, vel);
+						setSeq(smfTrack.seq, timestamp, [0xe0 | chNo, gt, vel]);
+					}
 					break;
 
 				// 1-byte DT1 SysEx for Roland devices
@@ -1096,18 +1108,20 @@ function convertRcmToSeq(rcm) {
 			}
 
 			// Note off
-			for (let noteNo = 0; noteNo < noteGts.length; noteNo++) {
-				const noteGt = noteGts[noteNo];
-				console.assert(noteGt >= 0);
-				if (noteGt === 0) {
-					continue;
-				}
+			if (chNo >= 0) {
+				for (let noteNo = 0; noteNo < noteGts.length; noteNo++) {
+					const noteGt = noteGts[noteNo];
+					console.assert(noteGt >= 0);
+					if (noteGt === 0) {
+						continue;
+					}
 
-				if (noteGt <= st) {
-					setSeq(smfTrack.seq, timestamp + noteGt, [0x90 | chNo, noteNo, 0]);
-					noteGts[noteNo] = 0;
-				} else {
-					noteGts[noteNo] -= st;
+					if (noteGt <= st) {
+						setSeq(smfTrack.seq, timestamp + noteGt, [0x90 | chNo, noteNo, 0]);
+						noteGts[noteNo] = 0;
+					} else {
+						noteGts[noteNo] -= st;
+					}
 				}
 			}
 
