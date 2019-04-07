@@ -7,7 +7,7 @@ const defaultSettings = {
 	initialRolDevDeviceId: 0x10,
 	initialRolDevModelId:  0x16,
 	initialYamDevDeviceId: 0x10,
-	initialYamDevModelId:  0x16,
+	initialYamDevModelId:  0x16,	// TODO: Investigate actual value.
 };
 
 export async function rcm2smf(buf, controlFileReader) {
@@ -570,17 +570,17 @@ function extractEvents(events, timeBase) {
 		case 0x99:	// External Command
 		case 0xf6:	// Comment Start
 			{
-				// Concats trailing F7 events.
-				const concattedEvent = [...event];
+				// Concatenates trailing F7 events.
+				const longEvent = [...event];
 				index++;
 				while (events[index][0] === 0xf7) {
-					concattedEvent.push(...convertEvent(events[index]).slice(1));
+					longEvent.push(...convertEvent(events[index]).slice(1));
 					index++;
 				}
 
 				// Trims trailing 0xf7.
-				const end = String.fromCodePoint(...concattedEvent).replace(/\xf7+$/u, '').length;
-				extractedEvents.push(concattedEvent.slice(0, end));
+				const end = String.fromCodePoint(...longEvent).replace(/\xf7+$/u, '').length;
+				extractedEvents.push(longEvent.slice(0, end));
 			}
 			break;
 
@@ -809,7 +809,7 @@ function convertRcmToSeq(rcm) {
 				if (chNo >= 0 && gt > 0 && vel > 0) {
 					const noteNo = cmd + keyShift;
 					if (0 <= noteNo && noteNo < 0x80) {
-						// Note on or Tie
+						// Note on or tie
 						console.assert(noteGts[noteNo] >= 0);
 						if (noteGts[noteNo] === 0) {
 							setSeq(smfTrack.seq, timestamp, [0x90 | chNo, noteNo, vel]);
@@ -966,8 +966,14 @@ function convertRcmToSeq(rcm) {
 					break;
 
 				case 0xe7:	// TEMPO
-					// TODO: Support tempo gradation
+					if (gt === 0) {
+						throw new Error(`Invalid tempo rate ${gt}`);
+					}
 					setSeq(conductorTrack.seq, timestamp, makeTempo(60 * 1000 * 1000 * 64.0 / (rcm.header.tempo * gt)));
+					if (vel !== 0) {
+						// TODO: Support tempo gradation
+						console.warn('Tempo gradation is not supported yet.', {vel});
+					}
 					break;
 
 				case 0xf5:	// Music Key
@@ -982,7 +988,7 @@ function convertRcmToSeq(rcm) {
 
 				case 0x99:	// External Command
 					{
-						const kind = (event[2] === 0x00) ? 'MCI' : (event[2] === 0x01) ? 'RUN' : '???';
+						const kind = (event[2] === 0x00) ? 'MCI: ' : (event[2] === 0x01) ? 'RUN: ' : '???: ';
 						setSeq(conductorTrack.seq, timestamp, makeText(0x07, [...strToBytes(kind), ...event.slice(4)]));
 					}
 					break;
@@ -1103,6 +1109,7 @@ function convertRcmToSeq(rcm) {
 
 				default:
 					console.warn(`${cmd.toString(16)}: Unknown command.`);
+					st = 0;
 					break;
 				}
 			}
@@ -1149,6 +1156,7 @@ function convertRcmToSeq(rcm) {
 		}
 	}
 
+	// TODO: Support "overwrite" when some kind of "global" meta event is added at the same timestamp. (e.g. Set Tempo)
 	function setSeq(map, timestamp, mes) {
 		console.assert(map instanceof Map, 'Invalid argument', {map});
 		console.assert(Number.isInteger(timestamp), 'Invalid argument', {timestamp});
@@ -1232,7 +1240,7 @@ function convertSeqToSmf(seq, timeBase = 48) {
 	console.assert(seq, 'Invalid argument', {seq});
 
 	// Makes a header chunk.
-	const mthd = [...strToBytes('MThd'), ...uintbe(6, 4), ...uintbe(1, 2), ...uintbe(seq.tracks.length, 2), ...uintbe(timeBase, 2)];
+	const mthd = [...strToBytes('MThd'), ...uintBE(6, 4), ...uintBE(1, 2), ...uintBE(seq.tracks.length, 2), ...uintBE(timeBase, 2)];
 
 	// Makes track chunks.
 	const mtrks = seq.tracks.map((smfTrack) => {
@@ -1261,7 +1269,7 @@ function convertSeqToSmf(seq, timeBase = 48) {
 		}, []);
 
 		// Extracts MTrk events with a leading MTrk header.
-		return [...strToBytes('MTrk'), ...uintbe(mtrk.length, 4), ...mtrk];
+		return [...strToBytes('MTrk'), ...uintBE(mtrk.length, 4), ...mtrk];
 	});
 
 	// Extracts track events with a leading header chunk.
@@ -1269,7 +1277,7 @@ function convertSeqToSmf(seq, timeBase = 48) {
 
 	return new Uint8Array(smf);
 
-	function uintbe(value, width) {
+	function uintBE(value, width) {
 		console.assert(Number.isInteger(value) && (width === 2 || width === 4), 'Invalid argument', {value, width});
 		const bytes = [];
 		for (let i = 0; i < width; i++) {

@@ -1,7 +1,7 @@
 {
   "name": "rcm2smf",
   "version": "0.1.0",
-  "description": "RECOMPOSER file (.RCP, .R36, .G36) to Standard MIDI File (.mid) Converter",
+  "description": "RECOMPOSER file (.RCP, .R36, .G36) to Standard MIDI File (.mid) converter",
   "main": "index.js",
   "module": "main.js",
   "bin": "index.js",
