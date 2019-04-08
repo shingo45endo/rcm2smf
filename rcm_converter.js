@@ -1240,11 +1240,18 @@ function convertSeqToSmf(seq, timeBase = 48) {
 	console.assert(seq, 'Invalid argument', {seq});
 
 	// Makes a header chunk.
-	const mthd = [...strToBytes('MThd'), ...uintBE(6, 4), ...uintBE(1, 2), ...uintBE(seq.tracks.length, 2), ...uintBE(timeBase, 2)];
+	const mthd = [
+		...strToBytes('MThd'),
+		...uintBE(2 + 2 + 2, 4),
+		...uintBE(1, 2),
+		...uintBE(seq.tracks.length, 2),
+		...uintBE(timeBase, 2),
+	];
 
 	// Makes track chunks.
 	const mtrks = seq.tracks.map((smfTrack) => {
 		let prevTime = 0;
+		let lastStatus = 0;
 		const mtrk = [...smfTrack.seq.entries()].sort((a, b) => a[0] - b[0]).reduce((p, c) => {
 			const [timestamp, events] = c;
 
@@ -1257,10 +1264,28 @@ function convertSeqToSmf(seq, timeBase = 48) {
 				prevTime = timestamp;
 
 				// Event
-				if (event[0] === 0xf0) {
+				const status = event[0];
+				if (status < 0xf0) {
+					// Channel messages
+					console.assert(status >= 0x80);
+					if (status === lastStatus) {
+						// Applies running status rule.
+						bytes.push(...event.slice(1));
+					} else {
+						bytes.push(...event);
+					}
+					lastStatus = status;
+
+				} else if (status === 0xf0) {
+					// SysEx
 					bytes.push(0xf0, ...varNum(event.length - 1), ...event.slice(1));
+					lastStatus = 0;
+
 				} else {
+					// Meta events
+					console.assert(status === 0xff);	// This converter doesn't generate F7 SysEx.
 					bytes.push(...event);
+					lastStatus = 0;
 				}
 			}
 
