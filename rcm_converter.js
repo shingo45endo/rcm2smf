@@ -693,8 +693,9 @@ function spaceEachSysEx(sysExs, totalTick, timeBase) {
 function convertRcmToSeq(rcm) {
 	console.assert(rcm, 'Invalid argument', {rcm});
 
-	let baseTime = 0;
-	const smf = {
+	let startTime = 0;
+	const seq = {
+		timeBase: rcm.header.timeBase,
 		tracks: [],
 	};
 
@@ -705,22 +706,22 @@ function convertRcmToSeq(rcm) {
 	}
 
 	// Adds meta events to the conductor track.
-	const conductorTrack = {seq: new Map()};
-	smf.tracks.push(conductorTrack);
+	const conductorTrack = new Map();
+	seq.tracks.push(conductorTrack);
 
 	// Sequence Name and Text Events
-	setSeq(conductorTrack.seq, 0, makeText(0x03, rawTrim(rcm.header.title)));
+	setSeq(conductorTrack, 0, makeText(0x03, rawTrim(rcm.header.title)));
 	if (rcm.header.memoLines.some((e) => rawTrim(e).length > 0)) {
 		for (const memoLine of rcm.header.memoLines) {
-			setSeq(conductorTrack.seq, 0, makeText(0x01, memoLine));
+			setSeq(conductorTrack, 0, makeText(0x01, memoLine));
 		}
 	}
 
 	// Time Signature
-	setSeq(conductorTrack.seq, 0, [0xff, 0x58, 0x04, smfBeat.n, Math.log2(smfBeat.d), 0x18, 0x08]);
+	setSeq(conductorTrack, 0, [0xff, 0x58, 0x04, smfBeat.n, Math.log2(smfBeat.d), 0x18, 0x08]);
 
 	// Key Signature
-	setSeq(conductorTrack.seq, 0, makeKeySignature(rcm.header.key));
+	setSeq(conductorTrack, 0, makeKeySignature(rcm.header.key));
 
 	// Adds a setup measure which consists of SysEx converted from control files.
 	if (rcm.header.fileDataCM6 || rcm.header.fileDataGSD || rcm.header.fileDataGSD2) {
@@ -753,25 +754,25 @@ function convertRcmToSeq(rcm) {
 		}
 
 		// Decides each interval between SysExs.
-		const extraSt = calcSetupMeasureLength(smfBeat.n, smfBeat.d, rcm.header.timeBase);
-		const timings = spaceEachSysEx(allSysExs, extraSt, rcm.header.timeBase);
+		const extraSt = calcSetupMeasureLength(smfBeat.n, smfBeat.d, seq.timeBase);
+		const timings = spaceEachSysEx(allSysExs, extraSt, seq.timeBase);
 		const maxUsecPerBeat = Math.max(...timings.map((e) => e.usecPerBeat));
 
 		// Sets tempo slow during the setup measure.
-		setSeq(conductorTrack.seq, baseTime, makeTempo(maxUsecPerBeat));
+		setSeq(conductorTrack, startTime, makeTempo(maxUsecPerBeat));
 
 		// Inserts SysExs from control files
-		let timestamp = baseTime;
+		let timestamp = startTime;
 		for (const timing of timings) {
-			setSeq(conductorTrack.seq, timestamp, timing.sysEx);
+			setSeq(conductorTrack, timestamp, timing.sysEx);
 			timestamp += timing.tick;
 		}
 
-		baseTime += extraSt;
+		startTime += extraSt;
 	}
 
 	// Set Tempo
-	setSeq(conductorTrack.seq, baseTime, makeTempo(60 * 1000 * 1000 / rcm.header.tempo));
+	setSeq(conductorTrack, startTime, makeTempo(60 * 1000 * 1000 / rcm.header.tempo));
 
 	// Converts each track.
 	const isAllPortSame = ((new Set(rcm.tracks.map((e) => e.portNo))).size === 1);
@@ -782,21 +783,19 @@ function convertRcmToSeq(rcm) {
 			continue;
 		}
 
-		const smfTrack = {
-			seq: new Map(),
-		};
+		const smfTrack = new Map();
 		const noteGts = new Array(128).fill(0);
 		const keyShift = ((rcmTrack.keyShift & 0x80) !== 0) ? 0 : rcm.header.playBias + rcmTrack.keyShift - ((rcmTrack.keyShift >= 0x40) ? 0x80 : 0);
-		let timestamp = baseTime + rcmTrack.stShift;
+		let timestamp = startTime + rcmTrack.stShift;
 		let {chNo, portNo} = rcmTrack;
 		let rolDev, rolBase, yamDev, yamBase;	// TODO: Investigate whether they belong to track or global.
 
 		// Track Name
-		setSeq(smfTrack.seq, 0, makeText(0x03, rawTrim(rcmTrack.memo)));
+		setSeq(smfTrack, 0, makeText(0x03, rawTrim(rcmTrack.memo)));
 
 		// If any port No. are not same among all the track, adds an unofficial MIDI Port meta event. (0x21)
 		if (!isAllPortSame) {
-			setSeq(smfTrack.seq, 0, [0xff, 0x21, 0x01, portNo]);
+			setSeq(smfTrack, 0, [0xff, 0x21, 0x01, portNo]);
 		}
 
 		// Converts each RCM event to MIDI/SysEx/meta event.
@@ -812,7 +811,7 @@ function convertRcmToSeq(rcm) {
 						// Note on or tie
 						console.assert(noteGts[noteNo] >= 0);
 						if (noteGts[noteNo] === 0) {
-							setSeq(smfTrack.seq, timestamp, [0x90 | chNo, noteNo, vel]);
+							setSeq(smfTrack, timestamp, [0x90 | chNo, noteNo, vel]);
 						}
 						noteGts[noteNo] = gt;
 					} else {
@@ -835,13 +834,13 @@ function convertRcmToSeq(rcm) {
 					throwUnless7bit(gt, vel);
 					{
 						const {bytes, memo} = rcm.header.userSysExs[cmd - 0x90];
-						setSeq(smfTrack.seq, timestamp, makeText(0x01, rawTrim(memo)));
-						setSeq(smfTrack.seq, timestamp, makeSysEx(bytes, chNo, gt, vel));
+						setSeq(smfTrack, timestamp, makeText(0x01, rawTrim(memo)));
+						setSeq(smfTrack, timestamp, makeSysEx(bytes, chNo, gt, vel));
 					}
 					break;
 				case 0x98:	// Tr.Excl
 					throwUnless7bit(gt, vel);
-					setSeq(smfTrack.seq, timestamp, makeSysEx(event.slice(4), chNo, gt, vel));
+					setSeq(smfTrack, timestamp, makeSysEx(event.slice(4), chNo, gt, vel));
 					break;
 
 				// MIDI messages
@@ -851,39 +850,39 @@ function convertRcmToSeq(rcm) {
 					// But, a BankPrg event is converted to a single MSB or LSB at the current implementation.
 					if (chNo >= 0) {
 						throwUnless7bit(gt, vel);
-						setSeq(smfTrack.seq, timestamp, [0xb0 | chNo, (cmd === 0xe2) ? 0 : 32, vel]);
-						setSeq(smfTrack.seq, timestamp, [0xc0 | chNo, gt]);
+						setSeq(smfTrack, timestamp, [0xb0 | chNo, (cmd === 0xe2) ? 0 : 32, vel]);
+						setSeq(smfTrack, timestamp, [0xc0 | chNo, gt]);
 					}
 					break;
 
 				case 0xea:	// AFTER C.
 					if (chNo >= 0) {
 						throwUnless7bit(gt);
-						setSeq(smfTrack.seq, timestamp, [0xd0 | chNo, gt]);
+						setSeq(smfTrack, timestamp, [0xd0 | chNo, gt]);
 					}
 					break;
 				case 0xeb:	// CONTROL
 					if (chNo >= 0) {
 						throwUnless7bit(gt, vel);
-						setSeq(smfTrack.seq, timestamp, [0xb0 | chNo, gt, vel]);
+						setSeq(smfTrack, timestamp, [0xb0 | chNo, gt, vel]);
 					}
 					break;
 				case 0xec:	// PROGRAM
 					if (chNo >= 0) {
 						throwUnless7bit(gt);
-						setSeq(smfTrack.seq, timestamp, [0xc0 | chNo, gt]);
+						setSeq(smfTrack, timestamp, [0xc0 | chNo, gt]);
 					}
 					break;
 				case 0xed:	// AFTER K.
 					if (chNo >= 0) {
 						throwUnless7bit(gt, vel);
-						setSeq(smfTrack.seq, timestamp, [0xa0 | chNo, gt, vel]);
+						setSeq(smfTrack, timestamp, [0xa0 | chNo, gt, vel]);
 					}
 					break;
 				case 0xee:	// PITCH
 					if (chNo >= 0) {
 						throwUnless7bit(gt, vel);
-						setSeq(smfTrack.seq, timestamp, [0xe0 | chNo, gt, vel]);
+						setSeq(smfTrack, timestamp, [0xe0 | chNo, gt, vel]);
 					}
 					break;
 
@@ -912,7 +911,7 @@ function convertRcmToSeq(rcm) {
 						// Makes a SysEx by UsrExcl/Tr.Excl parser.
 						const bytes = [0x41, ...rolDev, 0x12, 0x83, ...rolBase, 0x80, 0x81, 0x84];
 						console.assert(bytes.length === 10);
-						setSeq(smfTrack.seq, timestamp, makeSysEx(bytes, chNo, gt, vel));
+						setSeq(smfTrack, timestamp, makeSysEx(bytes, chNo, gt, vel));
 					}
 					break;
 
@@ -945,7 +944,7 @@ function convertRcmToSeq(rcm) {
 						// Makes a SysEx.
 						const bytes = [0xf0, 0x43, ...yamDev, ...yamBase, gt, vel, 0xf7];
 						console.assert(bytes.length === 9);
-						setSeq(smfTrack.seq, timestamp, bytes);
+						setSeq(smfTrack, timestamp, bytes);
 					}
 					break;
 
@@ -960,7 +959,7 @@ function convertRcmToSeq(rcm) {
 						// Adds an unofficial MIDI Port meta event if necessary.
 						if (portNo !== oldPortNo) {
 							// TODO: Investigate whether this event can be appeared in the song body.
-							setSeq(smfTrack.seq, timestamp, [0xff, 0x21, 0x01, portNo]);
+							setSeq(smfTrack, timestamp, [0xff, 0x21, 0x01, portNo]);
 						}
 					}
 					break;
@@ -969,7 +968,7 @@ function convertRcmToSeq(rcm) {
 					if (gt === 0) {
 						throw new Error(`Invalid tempo rate ${gt}`);
 					}
-					setSeq(conductorTrack.seq, timestamp, makeTempo(60 * 1000 * 1000 * 64.0 / (rcm.header.tempo * gt)));
+					setSeq(conductorTrack, timestamp, makeTempo(60 * 1000 * 1000 * 64.0 / (rcm.header.tempo * gt)));
 					if (vel !== 0) {
 						// TODO: Support tempo gradation
 						console.warn('Tempo gradation is not supported yet.', {vel});
@@ -977,19 +976,19 @@ function convertRcmToSeq(rcm) {
 					break;
 
 				case 0xf5:	// Music Key
-					setSeq(conductorTrack.seq, timestamp, makeKeySignature(st));
+					setSeq(conductorTrack, timestamp, makeKeySignature(st));
 					st = 0;
 					break;
 
 				case 0xf6:	// Comment
-					setSeq(smfTrack.seq, timestamp, makeText(0x01, event.slice(1)));
+					setSeq(smfTrack, timestamp, makeText(0x01, event.slice(1)));
 					st = 0;
 					break;
 
 				case 0x99:	// External Command
 					{
 						const kind = (event[2] === 0x00) ? 'MCI: ' : (event[2] === 0x01) ? 'RUN: ' : '???: ';
-						setSeq(conductorTrack.seq, timestamp, makeText(0x07, [...strToBytes(kind), ...event.slice(4)]));
+						setSeq(conductorTrack, timestamp, makeText(0x07, [...strToBytes(kind), ...event.slice(4)]));
 					}
 					break;
 
@@ -1020,7 +1019,7 @@ function convertRcmToSeq(rcm) {
 							57: 'show 9th track',
 							61: 'mute 1st track',
 						}[gt] || 'unknown';
-						setSeq(conductorTrack.seq, timestamp, makeText(0x07, [...strToBytes(`KeyScan: ${cue}`)]));
+						setSeq(conductorTrack, timestamp, makeText(0x07, [...strToBytes(`KeyScan: ${cue}`)]));
 					}
 					break;
 
@@ -1044,67 +1043,67 @@ function convertRcmToSeq(rcm) {
 				// Special commands for particular devices
 				case 0xc0:	// DX7FUNC
 					throwUnless7bit(gt, vel);
-					setSeq(smfTrack.seq, timestamp, [0xf0, 0x43, 0x11, 0x08, gt, vel, 0xf7]);
+					setSeq(smfTrack, timestamp, [0xf0, 0x43, 0x11, 0x08, gt, vel, 0xf7]);
 					break;
 				case 0xc1:	// DX.PARA
 					throwUnless7bit(gt, vel);
-					setSeq(smfTrack.seq, timestamp, [0xf0, 0x43, 0x11, 0x00, gt, vel, 0xf7]);
+					setSeq(smfTrack, timestamp, [0xf0, 0x43, 0x11, 0x00, gt, vel, 0xf7]);
 					break;
 				case 0xc2:	// DX.PERF
 					throwUnless7bit(gt, vel);
-					setSeq(smfTrack.seq, timestamp, [0xf0, 0x43, 0x11, 0x04, gt, vel, 0xf7]);
+					setSeq(smfTrack, timestamp, [0xf0, 0x43, 0x11, 0x04, gt, vel, 0xf7]);
 					break;
 				case 0xc3:	// TX.FUNC
 					throwUnless7bit(gt, vel);
-					setSeq(smfTrack.seq, timestamp, [0xf0, 0x43, 0x11, 0x11, gt, vel, 0xf7]);
+					setSeq(smfTrack, timestamp, [0xf0, 0x43, 0x11, 0x11, gt, vel, 0xf7]);
 					break;
 				case 0xc5:	// FB-01 P
 					throwUnless7bit(gt, vel);
-					setSeq(smfTrack.seq, timestamp, [0xf0, 0x43, 0x11, 0x15, gt, vel, 0xf7]);
+					setSeq(smfTrack, timestamp, [0xf0, 0x43, 0x11, 0x15, gt, vel, 0xf7]);
 					break;
 				case 0xc6:	// FB-01 S
 					throwUnless7bit(gt, vel);
-					setSeq(smfTrack.seq, timestamp, [0xf0, 0x43, 0x75, 0x01, 0x10, gt, vel, 0xf7]);
+					setSeq(smfTrack, timestamp, [0xf0, 0x43, 0x75, 0x01, 0x10, gt, vel, 0xf7]);
 					break;
 				case 0xc7:	// TX81Z V
 					throwUnless7bit(gt, vel);
-					setSeq(smfTrack.seq, timestamp, [0xf0, 0x43, 0x11, 0x12, gt, vel, 0xf7]);
+					setSeq(smfTrack, timestamp, [0xf0, 0x43, 0x11, 0x12, gt, vel, 0xf7]);
 					break;
 				case 0xc8:	// TX81Z A
 					throwUnless7bit(gt, vel);
-					setSeq(smfTrack.seq, timestamp, [0xf0, 0x43, 0x11, 0x13, gt, vel, 0xf7]);
+					setSeq(smfTrack, timestamp, [0xf0, 0x43, 0x11, 0x13, gt, vel, 0xf7]);
 					break;
 				case 0xc9:	// TX81Z P
 					throwUnless7bit(gt, vel);
-					setSeq(smfTrack.seq, timestamp, [0xf0, 0x43, 0x11, 0x10, gt, vel, 0xf7]);
+					setSeq(smfTrack, timestamp, [0xf0, 0x43, 0x11, 0x10, gt, vel, 0xf7]);
 					break;
 				case 0xca:	// TX81Z S
 					throwUnless7bit(gt, vel);
-					setSeq(smfTrack.seq, timestamp, [0xf0, 0x43, 0x11, 0x10, 0x7b, gt, vel, 0xf7]);
+					setSeq(smfTrack, timestamp, [0xf0, 0x43, 0x11, 0x10, 0x7b, gt, vel, 0xf7]);
 					break;
 				case 0xcb:	// TX81Z E
 					throwUnless7bit(gt, vel);
-					setSeq(smfTrack.seq, timestamp, [0xf0, 0x43, 0x11, 0x10, 0x7c, gt, vel, 0xf7]);
+					setSeq(smfTrack, timestamp, [0xf0, 0x43, 0x11, 0x10, 0x7c, gt, vel, 0xf7]);
 					break;
 				case 0xcc:	// DX7-2 R
 					throwUnless7bit(gt, vel);
-					setSeq(smfTrack.seq, timestamp, [0xf0, 0x43, 0x11, 0x1b, gt, vel, 0xf7]);
+					setSeq(smfTrack, timestamp, [0xf0, 0x43, 0x11, 0x1b, gt, vel, 0xf7]);
 					break;
 				case 0xcd:	// DX7-2 A
 					throwUnless7bit(gt, vel);
-					setSeq(smfTrack.seq, timestamp, [0xf0, 0x43, 0x11, 0x18, gt, vel, 0xf7]);
+					setSeq(smfTrack, timestamp, [0xf0, 0x43, 0x11, 0x18, gt, vel, 0xf7]);
 					break;
 				case 0xce:	// DX7-2 P
 					throwUnless7bit(gt, vel);
-					setSeq(smfTrack.seq, timestamp, [0xf0, 0x43, 0x11, 0x19, gt, vel, 0xf7]);
+					setSeq(smfTrack, timestamp, [0xf0, 0x43, 0x11, 0x19, gt, vel, 0xf7]);
 					break;
 				case 0xcf:	// TX802 P
 					throwUnless7bit(gt, vel);
-					setSeq(smfTrack.seq, timestamp, [0xf0, 0x43, 0x11, 0x1a, gt, vel, 0xf7]);
+					setSeq(smfTrack, timestamp, [0xf0, 0x43, 0x11, 0x1a, gt, vel, 0xf7]);
 					break;
 				case 0xdc:	// MKS-7
 					throwUnless7bit(gt, vel);
-					setSeq(smfTrack.seq, timestamp, [0xf0, 0x41, 0x32, 0x01, gt, vel, 0xf7]);
+					setSeq(smfTrack, timestamp, [0xf0, 0x41, 0x32, 0x01, gt, vel, 0xf7]);
 					break;
 
 				default:
@@ -1124,7 +1123,7 @@ function convertRcmToSeq(rcm) {
 					}
 
 					if (noteGt <= st) {
-						setSeq(smfTrack.seq, timestamp + noteGt, [0x90 | chNo, noteNo, 0]);
+						setSeq(smfTrack, timestamp + noteGt, [0x90 | chNo, noteNo, 0]);
 						noteGts[noteNo] = 0;
 					} else {
 						noteGts[noteNo] -= st;
@@ -1136,18 +1135,18 @@ function convertRcmToSeq(rcm) {
 		}
 
 		// End of Track
-		setSeq(smfTrack.seq, timestamp, [0xff, 0x2f, 0x00]);
+		setSeq(smfTrack, timestamp, [0xff, 0x2f, 0x00]);
 		if (timestamp > maxDuration) {
 			maxDuration = timestamp;
 		}
 
-		smf.tracks.push(smfTrack);
+		seq.tracks.push(smfTrack);
 	}
 
 	// End of Track for the conductor track
-	setSeq(conductorTrack.seq, maxDuration, [0xff, 0x2f, 0x00]);
+	setSeq(conductorTrack, maxDuration, [0xff, 0x2f, 0x00]);
 
-	return smf;
+	return seq;
 
 	function throwUnless7bit(...values) {
 		console.assert(values && values.length, 'Invalid argument', {values});
@@ -1236,7 +1235,7 @@ function convertRcmToSeq(rcm) {
 	}
 }
 
-function convertSeqToSmf(seq, timeBase = 48) {
+function convertSeqToSmf(seq) {
 	console.assert(seq, 'Invalid argument', {seq});
 
 	// Makes a header chunk.
@@ -1245,14 +1244,14 @@ function convertSeqToSmf(seq, timeBase = 48) {
 		...uintBE(2 + 2 + 2, 4),
 		...uintBE(1, 2),
 		...uintBE(seq.tracks.length, 2),
-		...uintBE(timeBase, 2),
+		...uintBE(seq.timeBase, 2),
 	];
 
 	// Makes track chunks.
 	const mtrks = seq.tracks.map((smfTrack) => {
 		let prevTime = 0;
 		let lastStatus = 0;
-		const mtrk = [...smfTrack.seq.entries()].sort((a, b) => a[0] - b[0]).reduce((p, c) => {
+		const mtrk = [...smfTrack.entries()].sort((a, b) => a[0] - b[0]).reduce((p, c) => {
 			const [timestamp, events] = c;
 
 			// Makes MTrk events.
