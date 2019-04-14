@@ -4,7 +4,7 @@ import util from 'util';
 import assert from 'assert';
 
 import iconv from 'iconv-lite';
-import {rcm2smf} from './rcm_converter.js';
+import {rcm2smf} from './rcm2smf.js';
 
 console.assert = assert;
 

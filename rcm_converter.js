@@ -10,20 +10,6 @@ const defaultSettings = {
 	initialYamDevModelId:  0x16,	// TODO: Investigate actual value.
 };
 
-export async function rcm2smf(buf, controlFileReader) {
-	// Checks the arguments.
-	if (!buf || !buf.length) {
-		throw new Error('Invalid argument');
-	}
-
-	// Converts from RCP/G36 to SMF.
-	const rcm = await parseRCM(buf, controlFileReader);
-	const seq = convertRcmToSeq(rcm);
-	const smf = convertSeqToSmf(seq, rcm.header.timeBase);
-
-	return smf;
-}
-
 export async function parseRCM(buf, controlFileReader) {
 	// Checks the arguments.
 	if (!buf || !buf.length || buf.length < 518 + 512 + 384) {
@@ -66,7 +52,7 @@ export async function parseRCM(buf, controlFileReader) {
 	return rcm;
 }
 
-function parseRCP(buf) {
+export function parseRCP(buf) {
 	console.assert(buf && buf.length, 'Invalid argument', {buf});
 
 	// Checks the file header.
@@ -146,7 +132,7 @@ function parseRCP(buf) {
 	return rcm;
 }
 
-function parseG36(buf) {
+export function parseG36(buf) {
 	console.assert(buf && buf.length, 'Invalid argument', {buf});
 
 	// Checks the file header.
@@ -223,7 +209,7 @@ function parseG36(buf) {
 	return rcm;
 }
 
-function convertCM6ToSysEx(buf) {
+export function convertCM6ToSysEx(buf) {
 	console.assert(buf && buf.length, 'Invalid argument', {buf});
 
 	// Checks the file header.
@@ -290,7 +276,7 @@ function convertCM6ToSysEx(buf) {
 	}
 }
 
-function convertGSDToSysEx(buf) {
+export function convertGSDToSysEx(buf) {
 	console.assert(buf && buf.length, 'Invalid argument', {buf});
 
 	// Checks the file header.
@@ -690,7 +676,7 @@ function spaceEachSysEx(sysExs, totalTick, timeBase) {
 	}
 }
 
-function convertRcmToSeq(rcm) {
+export function convertRcmToSeq(rcm) {
 	console.assert(rcm, 'Invalid argument', {rcm});
 
 	let startTime = 0;
@@ -1235,7 +1221,7 @@ function convertRcmToSeq(rcm) {
 	}
 }
 
-function convertSeqToSmf(seq) {
+export function convertSeqToSmf(seq) {
 	console.assert(seq, 'Invalid argument', {seq});
 
 	// Makes a header chunk.
