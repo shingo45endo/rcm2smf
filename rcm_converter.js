@@ -1,4 +1,4 @@
-// Settings	(TODO: Can be specified from users)
+// Settings (TODO: Can be specified from users)
 const defaultSettings = {
 	maxLoopNestLevel:           5,
 	loopNumChangedFromInfLoop:  2,
@@ -10,50 +10,226 @@ const defaultSettings = {
 	initialYamDevModelId:  0x16,	// TODO: Investigate actual value.
 };
 
+const EVENT_RCP = {
+	UsrExc0:   0x90,	// User Exclusive 0
+	UsrExc1:   0x91,	// User Exclusive 1
+	UsrExc2:   0x92,	// User Exclusive 2
+	UsrExc3:   0x93,	// User Exclusive 3
+	UsrExc4:   0x94,	// User Exclusive 4
+	UsrExc5:   0x95,	// User Exclusive 5
+	UsrExc6:   0x96,	// User Exclusive 6
+	UsrExc7:   0x97,	// User Exclusive 7
+	TrExcl:    0x98,	// Track Exclusive
+	ExtCmd:    0x99,	// External Command
+	DX7FUNC:   0xc0,	// DX7 Function
+	DX_PARA:   0xc1,	// DX Voice Parameter
+	DX_PERF:   0xc2,	// DX Performance
+	TX_FUNC:   0xc3,	// TX Function
+	FB_01_P:   0xc5,	// FB-01 Parameter
+	FB_01_S:   0xc6,	// FB-01 System Parameter
+	TX81Z_V:   0xc7,	// TX81Z VCED
+	TX81Z_A:   0xc8,	// TX81Z ACED
+	TX81Z_P:   0xc9,	// TX81Z PCED
+	TX81Z_S:   0xca,	// TX81Z System
+	TX81Z_E:   0xcb,	// TX81Z Effect
+	DX7_2_R:   0xcc,	// DX7-2 Remote SW
+	DX7_2_A:   0xcd,	// DX7-2 ACED
+	DX7_2_P:   0xce,	// DX7-2 PCED
+	TX802_P:   0xcf,	// TX802 PCED
+	YamBase:   0xd0,	// YAMAHA Base Address
+	YamDev:    0xd1,	// YAMAHA Dev# & Model ID
+	YamPara:   0xd2,	// YAMAHA Address & Parameter
+	XGPara:    0xd3,	// YAMAHA XG Address & Parameter
+	MKS_7:     0xdc,	// Roland MKS-7
+	RolBase:   0xdd,	// Roland Base Address
+	RolPara:   0xde,	// Roland Address & Parameter
+	RolDev:    0xdf,	// Roland Dev# & Model ID
+	BankPrgL:  0xe1,	// Program Bank Change (LSB)
+	BankPrg:   0xe2,	// Program Bank Change (MSB)
+	KeyScan:   0xe5,	// Key Scan
+	MIDI_CH:   0xe6,	// MIDI Channel Change
+	TEMPO:     0xe7,	// Relative Tempo Change
+	AFTER_C:   0xea,	// After Touch (Ch.)
+	CONTROL:   0xeb,	// Control Change
+	PROGRAM:   0xec,	// Program Change
+	AFTER_K:   0xed,	// After Touch (Poly)
+	PITCH:     0xee,	// Pitch Bend Change
+	MusicKey:  0xf5,	// Music Key
+	Comment:   0xf6,	// Comment
+	SecondEvt: 0xf7,	// 2nd Event for Comment, TrExcl, and ExtCmd
+	LoopEnd:   0xf8,	// Loop End
+	LoopStart: 0xf9,	// Loop Start
+	SameMeas:  0xfc,	// Same Measure
+	MeasEnd:   0xfd,	// Measure End
+	TrackEnd:  0xfe,	// End of Track
+	CMU_800:     -1,
+	UserPrg:     -1,
+};
+
+const EVENT_MCP = {
+	UsrExc0:     -1,
+	UsrExc1:     -1,
+	UsrExc2:     -1,
+	UsrExc3:     -1,
+	UsrExc4:     -1,
+	UsrExc5:     -1,
+	UsrExc6:     -1,
+	UsrExc7:     -1,
+	TrExcl:      -1,
+	ExtCmd:      -1,
+	DX7FUNC:   0xc0,	// DX7 Function
+	DX_PARA:   0xc1,	// DX Voice Parameter
+	DX_PERF:   0xc2,	// DX Performance
+	TX_FUNC:   0xc3,	// TX Function
+	FB_01_P:   0xc5,	// FB-01 Parameter
+	FB_01_S:   0xc6,	// FB-01 System Parameter
+	TX81Z_V:   0xc7,	// TX81Z VCED
+	TX81Z_A:   0xc8,	// TX81Z ACED
+	TX81Z_P:   0xc9,	// TX81Z PCED
+	TX81Z_S:   0xca,	// TX81Z System
+	TX81Z_E:   0xcb,	// TX81Z Effect
+	DX7_2_R:   0xcc,	// DX7-2 Remote SW
+	DX7_2_A:   0xcd,	// DX7-2 ACED
+	DX7_2_P:   0xce,	// DX7-2 PCED
+	TX802_P:   0xcf,	// TX802 PCED
+	YamBase:     -1,
+	YamDev:      -1,
+	YamPara:     -1,
+	XGPara:      -1,
+	MKS_7:       -1,
+	RolBase:   0xe7,	// MT32BASE
+	RolPara:   0xe8,	// MT32PARA
+	RolDev:    0xe6,	// R.EXCLU
+	BankPrgL:    -1,
+	BankPrg:     -1,
+	KeyScan:     -1,
+	MIDI_CH:   0xd0,	// MIDI Channel Change
+	TEMPO:     0xfa,	// Relative Tempo Change
+	AFTER_C:   0xe3,	// After Touch (Ch.)
+	CONTROL:   0xe2,	// Control Change
+	PROGRAM:     -1,
+	AFTER_K:   0xe1,	// After Touch (Poly)
+	PITCH:     0xe4,	// Pitch Bend Change
+	MusicKey:    -1,
+	Comment:     -1,
+	SecondEvt:   -1,
+	LoopEnd:   0xfb,	// Loop End
+	LoopStart: 0xfc,	// Loop Start
+	SameMeas:    -1,
+	MeasEnd:   0xfd,	// Measure End
+	TrackEnd:  0xfe,	// End of Track
+	CMU_800:   0xf9,	// CMU-800
+	UserPrg:   0xe0,	// Program Change (User Patch)
+};
+
 export async function parseRCM(buf, controlFileReader) {
 	// Checks the arguments.
-	if (!buf || !buf.length || buf.length < 518 + 512 + 384) {
+	if (!buf || !buf.length) {
 		throw new Error('Invalid argument');
 	}
 
 	// Parses the data as RCP format. If it failed, parses it again as G36 format.
-	const rcm = parseRCP(buf) || parseG36(buf);
+	const rcm = parseRCP(buf) || parseG36(buf) || parseMCP(buf);
 	if (!rcm) {
 		throw new Error('Not RECOMPOSER file');
 	}
 
-	// Reads control files.
-	for (const kind of ['CM6', 'GSD', 'GSD2']) {
-		const name = `fileName${kind}`;
-		const data = `fileData${kind}`;
+	// Reads and parses control files.
+	for (const kind of ['MTD', 'CM6', 'GSD', 'GSD2']) {
+		if (!controlFileReader) {
+			console.error('Control file reader is not specified');
+			break;
+		}
+
+		const name  = `fileName${kind}`;
+		const data  = `fileData${kind}`;
+		const sysEx = `sysExs${kind}`;
 
 		if (rcm.header[name] && rcm.header[name].length > 0) {
-			const fileName = String.fromCodePoint(...rcm.header[name]);
-			if (controlFileReader) {
-				rcm.header[data] = await controlFileReader(fileName, (/^[\x20-\x7E]*$/u.test(fileName)) ? undefined : rcm.header[name]).catch((e) => {
-					console.error(`Not found: ${fileName}`, e);
-				});
-			} else {
-				console.error('Control file reader is not specified');
+			// Reads the control file.
+			const fileName = String.fromCharCode(...rcm.header[name]);
+			const buf = await controlFileReader(fileName, (/^[\x20-\x7E]*$/u.test(fileName)) ? undefined : rcm.header[name]).catch((e) => {
+				console.error(`Control file not found.`, e);
+			});
+
+			// Parses the control file.
+			if (buf) {
+				const sysExs = {
+					MTD:  convertMTDToSysEx,
+					CM6:  convertCM6ToSysEx,
+					GSD:  convertGSDToSysEx,
+					GSD2: convertGSDToSysEx,
+				}[kind](buf);
+				if (!sysExs) {
+					console.error(`Not ${kind.slice(0, 3)} file.`);
+					continue;
+				}
+
+				rcm.header[data]  = buf;
+				rcm.header[sysEx] = sysExs;
+
+				// Gets Patch Memory information for user patches.
+				if (kind === 'MTD') {
+					const patches = sysExs.filter((e) => {
+						// Extracts SysExs regarding Patch Memory. (#1-#128)
+						console.assert(e[0] === 0xf0 && e[1] === 0x41 && e[2] === 0x10 && e[3] === 0x16 && e[4] === 0x12);
+						return (e[5] === 0x05);	// Address '05 xx xx' is for Patch Memory
+					}).reduce((p, c) => {
+						// Splits payloads of SysExs by 8-byte.
+						console.assert(c.length > 5 + 3 + 2);
+						for (let i = 5 + 3; i < c.length; i += 8) {
+							const e = c.slice(i, i + 8);
+							if (e.length === 8) {
+								p.push(e);
+							}
+						}
+						return p;
+					}, []);
+					console.assert(patches.length === 192);
+					rcm.header.patches = patches;
+				}
 			}
 		}
 	}
 
 	// Executes post-processing for each track.
-	for (const track of rcm.tracks) {
-		// Sets MIDI channel No. and port No.
-		track.chNo   = (track.midiCh >= 0) ? track.midiCh % 16 : -1;
-		track.portNo = (track.midiCh >= 0) ? Math.trunc(track.midiCh / 16) : 0;
+	if (!rcm.header.isMCP) {
+		// For RCP/G36
+		for (const track of rcm.tracks) {
+			// Sets MIDI channel No. and port No.
+			track.chNo   = (track.midiCh >= 0) ? track.midiCh % 16 : -1;
+			track.portNo = (track.midiCh >= 0) ? Math.trunc(track.midiCh / 16) : 0;
 
-		// Extracts same measures and loops.
-		track.extractedEvents = extractEvents(track.events, rcm.header.timeBase);
+			// Extracts same measures and loops.
+			track.extractedEvents = extractEvents(track.events, rcm.header.timeBase, false);
+		}
+	} else {
+		// For MCP
+		for (const track of rcm.tracks.slice(1, -1)) {
+			// Sets MIDI channel No.
+			track.chNo = (track.midiCh >= 0) ? track.midiCh : -1;
+
+			// Extracts loops.
+			track.extractedEvents = extractEvents(track.events, rcm.header.timeBase, true);
+		}
+
+		// Extracts rhythm track.
+		console.assert(rcm.tracks.length >= 10);
+		const seqTrack     = rcm.tracks[9];
+		const patternTrack = rcm.tracks[0];
+
+		seqTrack.chNo = seqTrack.midiCh;
+		seqTrack.extractedEvents = extractRhythm(seqTrack.events, patternTrack.events);
 	}
 
 	return rcm;
 }
 
 export function parseRCP(buf) {
-	console.assert(buf && buf.length, 'Invalid argument', {buf});
+	// Checks the arguments.
+	if (!buf || !buf.length) {
+		throw new Error('Invalid argument');
+	}
 
 	// Checks the file header.
 	if (buf.length < 518 || !String.fromCharCode(...buf.slice(0x0000, 0x0020)).startsWith('RCM-PC98V2.0(C)COME ON MUSIC')) {
@@ -133,7 +309,10 @@ export function parseRCP(buf) {
 }
 
 export function parseG36(buf) {
-	console.assert(buf && buf.length, 'Invalid argument', {buf});
+	// Checks the arguments.
+	if (!buf || !buf.length) {
+		throw new Error('Invalid argument');
+	}
 
 	// Checks the file header.
 	if (buf.length < 518 || !String.fromCharCode(...buf.slice(0x0000, 0x0020)).startsWith('COME ON MUSIC RECOMPOSER RCP3.0')) {
@@ -209,78 +388,201 @@ export function parseG36(buf) {
 	return rcm;
 }
 
-export function convertCM6ToSysEx(buf) {
-	console.assert(buf && buf.length, 'Invalid argument', {buf});
+export function parseMCP(buf) {
+	// Checks the arguments.
+	if (!buf || !buf.length) {
+		throw new Error('Invalid argument');
+	}
 
 	// Checks the file header.
-	if (buf.length < 0x5843 ||
-	    !String.fromCharCode(...buf.slice(0x0000, 0x000d)).startsWith('COME ON MUSIC') ||
-	    !String.fromCharCode(...buf.slice(0x0010, 0x001a)).startsWith('R ')) {
+	// Note: Confirmed 3 types of header: 'M1', 'MC', and [0x00, 0x00]
+	if (buf.length < 256) {
+		return null;
+	}
+	const id = buf.slice(0x00, 0x02);
+	if (!/^(?:M1|MC)$/u.test(String.fromCharCode(...id)) && !(id[0] === 0x00 && id[1] === 0x00)) {
 		return null;
 	}
 
-	const sysExs = [];
+	const view = new DataView(buf.buffer, buf.byteOffset);
+	const rcm = {header: {}, tracks: []};
 
-	// [LA SOUND PART]
-	// System Area
-	sysExs.push(makeSysEx(buf.slice(0x0080, 0x0098), 0x10, 0x00, 0x00));
+	// Header
+	rcm.header.title = buf.slice(0x02, 0x20);
 
-	// Timbre Memory (#1 - #64)
-	for (let i = 0; i < 64; i++) {
-		const index = 0x0e34 + i * 0x100;
-		sysExs.push(makeSysEx(buf.slice(index, index + 0x100), 0x08, i * 2, 0x00));
+	rcm.header.timeBase = view.getUint8(0x20);
+	rcm.header.tempo    = view.getUint8(0x21);
+	rcm.header.beatN    = view.getUint8(0x22);
+	rcm.header.beatD    = view.getUint8(0x23);
+	rcm.header.key      = view.getUint8(0x24);
+
+	if (buf[0x60] !== 0x00 && buf[0x60] !== 0x20) {
+		rcm.header.fileNameMTD = new Uint8Array([...rawTrim(rawTrimNul(buf.slice(0x60, 0x66))), '.'.codePointAt(), ...rawTrim(rawTrimNul(buf.slice(0x66, 0x69)))]);
 	}
 
-	// Rhythm Setup Temporary Area
-	sysExs.push(makeSysEx(buf.slice(0x0130, 0x0230), 0x03, 0x01, 0x10));	// #24 - #87
-	sysExs.push(makeSysEx(buf.slice(0x0230, 0x0284), 0x03, 0x03, 0x10));	// #88 - #108
+	rcm.header.maxTracks = 1 + 8 + 1;
+	rcm.header.isMCP = true;
 
-	// Patch Temporary Area
-	sysExs.push(makeSysEx(buf.slice(0x00a0, 0x0130), 0x03, 0x00, 0x00));
+	// Tracks
+	rcm.tracks = [...new Array(rcm.header.maxTracks)].map((_, i) => {
+		const track = {events: []};
+		if (i > 0) {
+			track.midiCh = view.getInt8(0x40 + i - 1);
+			track.isCMU  = (buf[0x50 + i - 1] !== 0);
+			track.memo   = buf.slice(0x70 + (i - 1) * 16, 0x70 + i * 16);
+		}
+		return track;
+	});
 
-	// Timbre Temporary Area
-	for (let i = 0; i < 8; i++) {
-		const addr = i * 0xf6;
-		const index = 0x0284 + addr;
-		sysExs.push(makeSysEx(buf.slice(index, index + 0xf6), 0x04, addr >> 7, addr & 0x7f));
+	// All events
+	const events = buf.slice(0x0100).reduce((p, _, i, a) => {
+		if (i % 4 === 0) {
+			p.push(a.slice(i, i + 4));
+		}
+		return p;
+	}, []);
+	if (events[events.length - 1].length !== 4) {
+		events.pop();
 	}
 
-	// Patch Memory (#1 - #128)
-	for (let i = 0; i < 8; i++) {
-		const index = 0x0a34 + i * 0x80;
-		sysExs.push(makeSysEx(buf.slice(index, index + 0x80), 0x05, i, 0x00));
+	// Separates all the events into each track.
+	let trackNo = 0;
+	for (const event of events) {
+		console.assert(Array.isArray(rcm.tracks[trackNo].events));
+		rcm.tracks[trackNo].events.push(event);
+
+		if (event[0] === EVENT_MCP.TrackEnd) {
+			trackNo++;
+			if (trackNo >= rcm.header.maxTracks) {
+				break;
+			}
+		}
 	}
 
-	// [PCM SOUND PART]
-	// Patch Temporary Area
-	sysExs.push(makeSysEx(buf.slice(0x4e34, 0x4ef1), 0x50, 0x00, 0x00));
-
-	// Patch Memory (#1 - #128)
-	for (let i = 0; i < 16; i++) {
-		const addr = i * 0x98;
-		const index = 0x4eb2 + addr;
-		sysExs.push(makeSysEx(buf.slice(index, index + 0x98), 0x51, addr >> 7, addr & 0x7f));
-	}
-
-	// System Area
-	sysExs.push(makeSysEx(buf.slice(0x5832, 0x5843), 0x52, 0x00, 0x00));
-
-	console.assert(sysExs.every((e) => e.length <= 256 + 10), 'Too long SysEx', {sysExs});
-	return sysExs;
-
-	function makeSysEx(bytes, addrH, addrM, addrL) {
-		console.assert([addrH, addrM, addrL].every((e) => (0x00 <= e && e < 0x80)), 'Invalid address', {addrH, addrM, addrL});
-		const sysEx = [0xf0, 0x41, 0x10, 0x16, 0x12, addrH, addrM, addrL, ...bytes, 0, 0xf7];
-		sysEx[sysEx.length - 2] = checkSum(sysEx.slice(5, -2));
-		return sysEx;
-	}
+	return rcm;
 }
 
-export function convertGSDToSysEx(buf) {
-	console.assert(buf && buf.length, 'Invalid argument', {buf});
+export const [convertMTDToSysEx, convertCM6ToSysEx] = ['MTD', 'CM6'].map((kind) => {
+	const pos = {
+		MTD: {
+			la: {
+				SystemArea:      0x0080,
+				PatchTempArea:   0x00a0,
+				RhythmSetupTemp: 0x0130,
+				TimbreTempArea:  0x0230,
+				PatchMemory:     0x09e0,
+				UserPatch:       0x0de0,	// Only for MTD
+				TimbreMemory:    0x0fe0,
+			},
+			totalSize: 0x4fe0,
+		},
+		CM6: {
+			la: {
+				SystemArea:       0x0080,
+				PatchTempArea:    0x00a0,
+				RhythmSetupTemp:  0x0130,
+				RhythmSetupTemp2: 0x0230,	// Only for CM6
+				TimbreTempArea:   0x0284,
+				PatchMemory:      0x0a34,
+				TimbreMemory:     0x0e34,
+			},
+			pcm: {
+				PatchTempArea: 0x4e34,
+				PatchMemory:   0x4eb2,
+				SystemArea:    0x5832,
+			},
+			totalSize: 0x5843,
+		},
+	}[kind];
 
+	return (buf) => {
+		// Checks the file header.
+		console.assert(pos.totalSize);
+		if (!buf || !buf.length || buf.length < pos.totalSize ||
+		    !String.fromCharCode(...buf.slice(0x0000, 0x000d)).startsWith('COME ON MUSIC') ||
+		    !String.fromCharCode(...buf.slice(0x0010, 0x0012)).startsWith('R ')) {
+			return null;
+		}
+		const idStr = String.fromCharCode(...buf.slice(0x0012, 0x001a));
+		if (!idStr.startsWith('MT-32') && !idStr.startsWith('CM-64')) {
+			return null;
+		}
+
+		const sysExs = [];
+
+		// [LA SOUND PART]
+		console.assert(pos.la);
+
+		// System Area
+		sysExs.push(makeSysEx(buf.slice(pos.la.SystemArea, pos.la.SystemArea + 0x17), 0x10, 0x00, 0x00));
+
+		// Timbre Memory (#1 - #64)
+		for (let i = 0; i < 64; i++) {
+			const index = pos.la.TimbreMemory + i * 0x100;
+			sysExs.push(makeSysEx(buf.slice(index, index + 0x100), 0x08, i * 2, 0x00));
+		}
+
+		// Rhythm Setup Temporary Area
+		sysExs.push(makeSysEx(buf.slice(pos.la.RhythmSetupTemp, pos.la.RhythmSetupTemp + 0x4 * 64), 0x03, 0x01, 0x10));	// #24 - #87
+		if (pos.la.RhythmSetupTemp2) {
+			sysExs.push(makeSysEx(buf.slice(pos.la.RhythmSetupTemp2, pos.la.RhythmSetupTemp2 + 0x4 * 21), 0x03, 0x03, 0x10));	// #88 - #108
+		}
+
+		// Patch Temporary Area
+		sysExs.push(makeSysEx(buf.slice(pos.la.PatchTempArea, pos.la.PatchTempArea + 0x10 * 9), 0x03, 0x00, 0x00));
+
+		// Timbre Temporary Area
+		for (let i = 0; i < 8; i++) {
+			const addr = i * 0xf6;	// 0xf6: 0x0e + 0x3a * 4
+			const index = pos.la.TimbreTempArea + addr;
+			sysExs.push(makeSysEx(buf.slice(index, index + 0xf6), 0x04, addr >> 7, addr & 0x7f));
+		}
+
+		// Patch Memory (#1 - #128)
+		for (let i = 0; i < 8; i++) {
+			const index = pos.la.PatchMemory + i * 0x8 * 16;
+			sysExs.push(makeSysEx(buf.slice(index, index + 0x8 * 16), 0x05, i, 0x00));
+		}
+
+		// User Patch (Only for MTD)
+		if (pos.la.UserPatch) {
+			for (let i = 0; i < 4; i++) {
+				const index = pos.la.UserPatch + i * 0x8 * 16;
+				sysExs.push(makeSysEx(buf.slice(index, index + 0x8 * 16), 0x05, i, 0x00));
+			}
+		}
+
+		// [PCM SOUND PART]
+		if (pos.pcm) {
+			// Patch Temporary Area
+			sysExs.push(makeSysEx(buf.slice(pos.pcm.PatchTempArea, pos.pcm.PatchTempArea + 0x15 * 6), 0x50, 0x00, 0x00));
+
+			// Patch Memory (#1 - #128)
+			for (let i = 0; i < 16; i++) {
+				const addr = i * 0x13 * 8;
+				const index = pos.pcm.PatchMemory + addr;
+				sysExs.push(makeSysEx(buf.slice(index, index + 0x13 * 8), 0x51, addr >> 7, addr & 0x7f));
+			}
+
+			// System Area
+			sysExs.push(makeSysEx(buf.slice(pos.pcm.SystemArea, pos.pcm.SystemArea + 0x11), 0x52, 0x00, 0x00));
+		}
+
+		console.assert(sysExs.every((e) => e.length <= 256 + 10), 'Too long SysEx', {sysExs});
+		return sysExs;
+
+		function makeSysEx(bytes, addrH, addrM, addrL) {
+			console.assert([addrH, addrM, addrL].every((e) => (0x00 <= e && e < 0x80)), 'Invalid address', {addrH, addrM, addrL});
+			const sysEx = [0xf0, 0x41, 0x10, 0x16, 0x12, addrH, addrM, addrL, ...bytes, 0, 0xf7];
+			sysEx[sysEx.length - 2] = checkSum(sysEx.slice(5, -2));
+			return sysEx;
+		}
+	};
+});
+
+export function convertGSDToSysEx(buf) {
 	// Checks the file header.
-	if (buf.length < 0x0a71 ||
+	if (!buf || !buf.length || buf.length < 0x0a71 ||
 	    !String.fromCharCode(...buf.slice(0x0000, 0x000d)).startsWith('COME ON MUSIC') ||
 	    !String.fromCharCode(...buf.slice(0x000e, 0x001c)).startsWith('GS CONTROL 1.0')) {
 		return null;
@@ -428,16 +730,21 @@ export function convertGSDToSysEx(buf) {
 	}
 }
 
-function extractEvents(events, timeBase) {
-	console.assert(events && events.length, 'Invalid argument', {events});
+function extractEvents(events, timeBase, isMCP) {
+	console.assert(Array.isArray(events), 'Invalid argument', {events});
 	console.assert(timeBase > 0, 'Invalid argument', {timeBase});
 
+	if (events.length === 0) {
+		return [];
+	}
+
 	// Sets constants and chooses event parser.
+	const EVENT = (isMCP) ? EVENT_MCP : EVENT_RCP;
 	const EVENT_LENGTH = events[0].length;
 	console.assert(EVENT_LENGTH === 4 || EVENT_LENGTH === 6, 'Event length must be 4 or 6', {EVENT_LENGTH});
 	console.assert(events.every((e) => e.length === EVENT_LENGTH), 'All of events must be same length', {events});
-	const HEADER_LENGTH = (EVENT_LENGTH === 4) ? 44 : 46;
-	const convertEvent = (EVENT_LENGTH === 4) ? convertEvent4byte : convertEvent6byte;
+	const HEADER_LENGTH = (isMCP) ? NaN      : (EVENT_LENGTH === 4) ? 44 : 46;
+	const convertEvent  = (isMCP) ? (e) => e : (EVENT_LENGTH === 4) ? convertEvent4byte : convertEvent6byte;
 
 	// Extracts same measures and loops.
 	const extractedEvents = [];
@@ -446,8 +753,8 @@ function extractEvents(events, timeBase) {
 	for (let index = 0; index < events.length;) {	// TODO: Avoid infinity loop
 		const event = convertEvent(events[index]);
 
-		// Resolves Same Measure (FC) event.
-		if (event[0] === 0xfc) {
+		// Resolves Same Measure event.
+		if (event[0] === EVENT.SameMeas) {
 			// If it is already in Same Measure mode, quits Same Measure.
 			if (lastIndex >= 0) {
 				// Leaves Same Measure mode and goes backs to the previous position.
@@ -455,21 +762,21 @@ function extractEvents(events, timeBase) {
 				lastIndex = -1;
 
 				// Adds a dummy End Measure event.
-				extractedEvents.push([0xfd, 0, 0xfc, 0xfc]);
+				extractedEvents.push([EVENT.MeasEnd, 0, 0xfc, 0xfc]);
 
 			} else {
 				// Enters Same Measure mode.
 				lastIndex = index;
 
 				// If the previous event isn't an End Measure event, adds a dummy End Measure event.
-				if (index > 0 && events[index - 1][0] !== 0xfd && events[index - 1][0] !== 0xfc) {
-					extractedEvents.push([0xfd, 0, 0xfc, 0xfc]);
+				if (index > 0 && events[index - 1][0] !== EVENT.MeasEnd && events[index - 1][0] !== EVENT.SameMeas) {
+					extractedEvents.push([EVENT.MeasEnd, 0, 0xfc, 0xfc]);
 				}
 
 				// Moves the current index to the measure.	// TODO: Avoid infinity loop
-				while (events[index][0] === 0xfc) {
+				while (events[index][0] === EVENT.SameMeas) {
 					const [cmd, measure, offset] = convertEvent(events[index]);
-					console.assert(cmd === 0xfc, {cmd, measure, offset});
+					console.assert(cmd === EVENT.SameMeas, {cmd, measure, offset});
 					index = (offset - HEADER_LENGTH) / EVENT_LENGTH;
 					if (!Number.isInteger(index)) {
 						throw new Error(`Invalid event ${events[index]}`);
@@ -481,11 +788,11 @@ function extractEvents(events, timeBase) {
 
 		// Handles a special event or just adds a normal event to the event array.
 		switch (event[0]) {
-		case 0xfc:	// Same Measure
+		case EVENT.SameMeas:
 			console.assert(false, 'Same Measure event must be resolved', {event});
 			break;
 
-		case 0xf9:	// Loop Start
+		case EVENT.LoopStart:
 			if (stacks.length < defaultSettings.maxLoopNestLevel) {
 				stacks.push({index, lastIndex,
 					count: -1,
@@ -497,7 +804,7 @@ function extractEvents(events, timeBase) {
 			index++;
 			break;
 
-		case 0xf8:	// Loop End
+		case EVENT.LoopEnd:
 			if (stacks.length > 0) {
 				const lastStack = stacks[stacks.length - 1];
 
@@ -537,12 +844,12 @@ function extractEvents(events, timeBase) {
 			}
 			break;
 
-		case 0xfe:	// End of Track
+		case EVENT.TrackEnd:
 			if (stacks.length > 0) {
 				console.warn(`Detected ${stacks.length}-level of unclosed loop. Ignored.`);
 			}
 			/* FALLTHRU */
-		case 0xfd:	// Measure End
+		case EVENT.MeasEnd:
 			if (lastIndex >= 0) {
 				index = lastIndex + 1;
 				lastIndex = -1;
@@ -552,25 +859,25 @@ function extractEvents(events, timeBase) {
 			extractedEvents.push([...event]);
 			break;
 
-		case 0x98:	// Channel Exclusive
-		case 0x99:	// External Command
-		case 0xf6:	// Comment Start
+		case EVENT.TrExcl:
+		case EVENT.ExtCmd:
+		case EVENT.Comment:
 			{
 				// Concatenates trailing F7 events.
 				const longEvent = [...event];
 				index++;
-				while (events[index][0] === 0xf7) {
+				while (events[index][0] === EVENT.SecondEvt) {
 					longEvent.push(...convertEvent(events[index]).slice(1));
 					index++;
 				}
 
 				// Trims trailing 0xf7.
-				const end = String.fromCodePoint(...longEvent).replace(/\xf7+$/u, '').length;
+				const end = String.fromCharCode(...longEvent).replace(/\xf7+$/u, '').length;
 				extractedEvents.push(longEvent.slice(0, end));
 			}
 			break;
 
-		case 0xf7:	// 2nd Event
+		case EVENT.SecondEvt:
 			console.warn(`Detected an unexpected F7 event. Ignored.`);
 			index++;
 			break;
@@ -587,9 +894,9 @@ function extractEvents(events, timeBase) {
 	function convertEvent4byte(bytes) {
 		console.assert(bytes && bytes.length && bytes.length === 4, 'Invalid argument', {bytes});
 
-		if (bytes[0] === 0xf6 || bytes[0] === 0xf7) {
+		if (bytes[0] === EVENT_RCP.Comment || bytes[0] === EVENT_RCP.SecondEvt) {
 			return [bytes[0], bytes[2], bytes[3]];
-		} else if (bytes[0] === 0xfc) {
+		} else if (bytes[0] === EVENT_RCP.SameMeas) {
 			const measure = bytes[1] | ((bytes[2] & 0x03) << 8);
 			const offset = (bytes[2] & 0xfc) | (bytes[3] << 8);
 			return [bytes[0], measure, offset];
@@ -600,9 +907,9 @@ function extractEvents(events, timeBase) {
 	function convertEvent6byte(bytes) {
 		console.assert(bytes && bytes.length && bytes.length === 6, 'Invalid argument', {bytes});
 
-		if (bytes[0] === 0xf6 || bytes[0] === 0xf7) {
+		if (bytes[0] === EVENT_RCP.Comment || bytes[0] === EVENT_RCP.SecondEvt) {
 			return [...bytes];
-		} else if (bytes[0] === 0xfc) {
+		} else if (bytes[0] === EVENT_RCP.SameMeas) {
 			const measure = bytes[2] | (bytes[3] << 8);
 			const offset = (bytes[4] | (bytes[5] << 8)) * 6 - 0xf2;
 			return [bytes[0], measure, offset];
@@ -610,6 +917,67 @@ function extractEvents(events, timeBase) {
 			return [bytes[0], bytes[2] | (bytes[3] << 8), bytes[4] | (bytes[5] << 8), bytes[1]];
 		}
 	}
+}
+
+function extractRhythm(seqEvents, patternEvents) {
+	console.assert(Array.isArray(seqEvents), 'Invalid argument', {seqEvents});
+	console.assert(Array.isArray(patternEvents), 'Invalid argument', {patternEvents});
+
+	// Rhythm pattern track
+	const patterns = patternEvents.reduce((p, c, i, a) => {
+		if (i % (16 + 1) === 0 && c[0] !== EVENT_MCP.TrackEnd) {
+			const pattern = a.slice(i, i + 16);
+			if (pattern.length !== 16 || a[i + 16][0] !== EVENT_MCP.MeasEnd) {
+				console.warn(`Invalid rhythm pattern. Ignored.`);
+			} else {
+				p.push(pattern);
+			}
+		}
+		return p;
+	}, []);
+
+	// Sequence track
+	const extractedEvents = [];
+	for (const seq of seqEvents) {
+		if (seq[0] === EVENT_MCP.TrackEnd) {
+			break;
+		}
+
+		// Chooses a rhythm pattern.
+		const [patternNo, ...velValues] = seq;
+		const pattern = patterns[patternNo - 1];
+		if (!pattern) {
+			console.warn(`Invalid rhythm pattern No.${patternNo}. Ignored.`);
+			continue;
+		}
+
+		// Extracts the rhythm pattern with velocity data from sequence track.
+		for (const shot of pattern) {
+			const velBits = shot.slice(0, 3).reduce((p, c) => {
+				p.push(...[(c >> 6) & 0x03, (c >> 4) & 0x03, (c >> 2) & 0x03, c & 0x03]);
+				return p;
+			}, []);
+
+			const events = velBits.reduce((p, c, i) => {
+				if (c > 0) {
+					const event = [
+						//  BD, SD, LT, MT, HT, RS, HC, CH, OH, CC, RC
+						[0, 36, 38, 41, 45, 48, 37, 39, 42, 44, 49, 51][i],	// Note No.
+						0,					// Step time
+						1,					// Gate time
+						velValues[c - 1],	// Velocity
+					];
+					p.push(event);
+				}
+				return p;
+			}, []);
+			events.push([0, shot[3], 0, 0]);	// For step time
+
+			extractedEvents.push(...events);
+		}
+	}
+
+	return extractedEvents;
 }
 
 function calcSetupMeasureLength(beatN, beatD, timeBase/* , minTick = 0 */) {	// TODO: Consider minTick
@@ -697,7 +1065,7 @@ export function convertRcmToSeq(rcm) {
 
 	// Sequence Name and Text Events
 	setSeq(conductorTrack, 0, makeText(0x03, rawTrim(rcm.header.title)));
-	if (rcm.header.memoLines.some((e) => rawTrim(e).length > 0)) {
+	if (rcm.header.memoLines && rcm.header.memoLines.some((e) => rawTrim(e).length > 0)) {
 		for (const memoLine of rcm.header.memoLines) {
 			setSeq(conductorTrack, 0, makeText(0x01, memoLine));
 		}
@@ -710,33 +1078,31 @@ export function convertRcmToSeq(rcm) {
 	setSeq(conductorTrack, 0, makeKeySignature(rcm.header.key));
 
 	// Adds a setup measure which consists of SysEx converted from control files.
-	if (rcm.header.fileDataCM6 || rcm.header.fileDataGSD || rcm.header.fileDataGSD2) {
-		// Parses control files.
+	if (rcm.header.sysExsMTD || rcm.header.sysExsCM6 || rcm.header.sysExsGSD || rcm.header.sysExsGSD2) {
+		// Gathers all the SysExs.
 		const allSysExs = [];
-		if (rcm.header.fileDataCM6) {
-			const sysExs = convertCM6ToSysEx(rcm.header.fileDataCM6);
-			if (sysExs) {
-				allSysExs.push(...sysExs);
-			} else {
-				console.warn(`Not CM6 file`);
-			}
+		if (rcm.header.sysExsMTD) {
+			// Removes redundant SysEx. (For User Patch)
+			const keys = new Set();
+			const newSysExs = rcm.header.sysExsMTD.reduce((p, c) => {
+				const key = c.slice(5, 8).map((e) => `${e}`).join(',');
+				if (!keys.has(key)) {
+					p.push(c);
+					keys.add(key);
+				}
+				return p;
+			}, []);
+			allSysExs.push(...newSysExs);
 		}
-		if (rcm.header.fileDataGSD) {
-			const sysExs = convertGSDToSysEx(rcm.header.fileDataGSD);
-			if (sysExs) {
-				allSysExs.push(...sysExs);
-			} else {
-				console.warn(`Not GSD file`);
-			}
+		if (rcm.header.sysExsCM6) {
+			allSysExs.push(...rcm.header.sysExsCM6);
 		}
-		if (rcm.header.fileDataGSD2) {
-			const sysExs = convertGSDToSysEx(rcm.header.fileDataGSD2);
-			if (sysExs) {
-				// TODO: Support >16ch
-				allSysExs.push(...sysExs);
-			} else {
-				console.warn(`Not GSD file`);
-			}
+		if (rcm.header.sysExsGSD) {
+			allSysExs.push(...rcm.header.sysExsGSD);
+		}
+		if (rcm.header.sysExsGSD2) {
+			// TODO: Support >16ch
+			allSysExs.push(...rcm.header.sysExsGSD2);
 		}
 
 		// Decides each interval between SysExs.
@@ -761,18 +1127,21 @@ export function convertRcmToSeq(rcm) {
 	setSeq(conductorTrack, startTime, makeTempo(60 * 1000 * 1000 / rcm.header.tempo));
 
 	// Converts each track.
+	const EVENT = (rcm.header.isMCP) ? EVENT_MCP : EVENT_RCP;
+	const isNoteOff = (rcm.header.isMCP) ? ((gt, st) => (gt < st)) : ((gt, st) => (gt <= st));
 	const isAllPortSame = ((new Set(rcm.tracks.map((e) => e.portNo))).size === 1);
 	let maxDuration = 0;
 	for (const rcmTrack of rcm.tracks) {
 		// Skips the track if it is empty or muted.
-		if ((rcmTrack.mode & 0x01) !== 0 || rcmTrack.extractedEvents.length <= 1) {
+		if (!rcmTrack.extractedEvents || rcmTrack.extractedEvents.length <= 1 || (rcmTrack.mode & 0x01) !== 0) {
 			continue;
 		}
 
 		const smfTrack = new Map();
-		const noteGts = new Array(128).fill(0);
-		const keyShift = ((rcmTrack.keyShift & 0x80) !== 0) ? 0 : rcm.header.playBias + rcmTrack.keyShift - ((rcmTrack.keyShift >= 0x40) ? 0x80 : 0);
-		let timestamp = startTime + rcmTrack.stShift;
+		const noteGts = new Array(128).fill(-1);
+		const patchNos = [...Array(128).keys()];
+		const keyShift = (rcm.header.isMCP || (rcmTrack.keyShift & 0x80) !== 0) ? 0 : rcm.header.playBias + rcmTrack.keyShift - ((rcmTrack.keyShift >= 0x40) ? 0x80 : 0);
+		let timestamp = startTime + (rcmTrack.stShift || 0);
 		let {chNo, portNo} = rcmTrack;
 		let rolDev, rolBase, yamDev, yamBase;	// TODO: Investigate whether they belong to track or global.
 
@@ -795,8 +1164,7 @@ export function convertRcmToSeq(rcm) {
 					const noteNo = cmd + keyShift;
 					if (0 <= noteNo && noteNo < 0x80) {
 						// Note on or tie
-						console.assert(noteGts[noteNo] >= 0);
-						if (noteGts[noteNo] === 0) {
+						if (noteGts[noteNo] < 0) {
 							setSeq(smfTrack, timestamp, [0x90 | chNo, noteNo, vel]);
 						}
 						noteGts[noteNo] = gt;
@@ -809,14 +1177,14 @@ export function convertRcmToSeq(rcm) {
 				// Command event
 				switch (cmd) {
 				// SysEx
-				case 0x90:	// UsrExc0
-				case 0x91:	// UsrExc1
-				case 0x92:	// UsrExc2
-				case 0x93:	// UsrExc3
-				case 0x94:	// UsrExc4
-				case 0x95:	// UsrExc5
-				case 0x96:	// UsrExc6
-				case 0x97:	// UsrExc7
+				case EVENT.UsrExc0:
+				case EVENT.UsrExc1:
+				case EVENT.UsrExc2:
+				case EVENT.UsrExc3:
+				case EVENT.UsrExc4:
+				case EVENT.UsrExc5:
+				case EVENT.UsrExc6:
+				case EVENT.UsrExc7:
 					throwUnless7bit(gt, vel);
 					{
 						const {bytes, memo} = rcm.header.userSysExs[cmd - 0x90];
@@ -824,14 +1192,14 @@ export function convertRcmToSeq(rcm) {
 						setSeq(smfTrack, timestamp, makeSysEx(bytes, chNo, gt, vel));
 					}
 					break;
-				case 0x98:	// Tr.Excl
+				case EVENT.TrExcl:
 					throwUnless7bit(gt, vel);
 					setSeq(smfTrack, timestamp, makeSysEx(event.slice(4), chNo, gt, vel));
 					break;
 
 				// MIDI messages
-				case 0xe1:	// BankPrgL (LSB)
-				case 0xe2:	// BankPrg  (MSB)
+				case EVENT.BankPrgL:
+				case EVENT.BankPrg:
 					// Note: According to the MIDI spec, Bank Select must be transmitted as a pair of MSB and LSB.
 					// But, a BankPrg event is converted to a single MSB or LSB at the current implementation.
 					if (chNo >= 0) {
@@ -841,31 +1209,51 @@ export function convertRcmToSeq(rcm) {
 					}
 					break;
 
-				case 0xea:	// AFTER C.
+				case EVENT.UserPrg:
+					if (chNo >= 0) {
+						if (gt < 0 || 192 <= gt) {
+							throw new Error(`Invalid value ${gt}`);
+						}
+
+						// Inserts a SysEx to set Patch Memory if necessary.
+						const progNo = gt & 0x7f;
+						if (patchNos[progNo] !== gt && rcm.header.patches) {
+							const addr = progNo * 8;
+							const bytes = [0x41, 0x10, 0x16, 0x12, 0x83, 0x05, (addr >> 7) & 0x7f, addr & 0x7f, ...rcm.header.patches[gt], 0x84];
+							console.assert(bytes.length === 17);
+							setSeq(smfTrack, timestamp, makeSysEx(bytes, chNo, 0, 0));
+							patchNos[progNo] = gt;
+						}
+
+						setSeq(smfTrack, timestamp, [0xc0 | chNo, progNo]);
+					}
+					break;
+
+				case EVENT.AFTER_C:
 					if (chNo >= 0) {
 						throwUnless7bit(gt);
 						setSeq(smfTrack, timestamp, [0xd0 | chNo, gt]);
 					}
 					break;
-				case 0xeb:	// CONTROL
+				case EVENT.CONTROL:
 					if (chNo >= 0) {
 						throwUnless7bit(gt, vel);
 						setSeq(smfTrack, timestamp, [0xb0 | chNo, gt, vel]);
 					}
 					break;
-				case 0xec:	// PROGRAM
+				case EVENT.PROGRAM:
 					if (chNo >= 0) {
 						throwUnless7bit(gt);
 						setSeq(smfTrack, timestamp, [0xc0 | chNo, gt]);
 					}
 					break;
-				case 0xed:	// AFTER K.
+				case EVENT.AFTER_K:
 					if (chNo >= 0) {
 						throwUnless7bit(gt, vel);
 						setSeq(smfTrack, timestamp, [0xa0 | chNo, gt, vel]);
 					}
 					break;
-				case 0xee:	// PITCH
+				case EVENT.PITCH:
 					if (chNo >= 0) {
 						throwUnless7bit(gt, vel);
 						setSeq(smfTrack, timestamp, [0xe0 | chNo, gt, vel]);
@@ -873,15 +1261,15 @@ export function convertRcmToSeq(rcm) {
 					break;
 
 				// 1-byte DT1 SysEx for Roland devices
-				case 0xdd:	// RolBase
+				case EVENT.RolBase:
 					throwUnless7bit(gt, vel);
 					rolBase = [gt, vel];
 					break;
-				case 0xdf:	// RolDev#
+				case EVENT.RolDev:
 					throwUnless7bit(gt, vel);
 					rolDev = [gt, vel];
 					break;
-				case 0xde:	// RolPara
+				case EVENT.RolPara:
 					throwUnless7bit(gt, vel);
 					{
 						// Initializes RolDev# and RolBase if they have not been set yet.
@@ -902,19 +1290,19 @@ export function convertRcmToSeq(rcm) {
 					break;
 
 				// 1-byte parameter change SysEx for YAMAHA XG devices
-				case 0xd0:	// YamBase
+				case EVENT.YamBase:
 					throwUnless7bit(gt, vel);
 					yamBase = [gt, vel];
 					break;
-				case 0xd1:	// YamDev#
+				case EVENT.YamDev:
 					throwUnless7bit(gt, vel);
 					yamDev = [gt, vel];
 					break;
-				case 0xd3:	// XGPara
+				case EVENT.XGPara:
 					throwUnless7bit(gt, vel);
 					yamDev = [0x10, 0x4c];	// Note: Is it really OK to overwrite YamDev#?
 					/* FALLTHRU */
-				case 0xd2:	// YamPara
+				case EVENT.YamPara:
 					throwUnless7bit(gt, vel);
 					{
 						// Initializes YamDev# and YamBase if they have not been set yet.
@@ -935,7 +1323,7 @@ export function convertRcmToSeq(rcm) {
 					break;
 
 				// Meta events
-				case 0xe6:	// MIDI CH.
+				case EVENT.MIDI_CH:
 					if (0 < gt && gt <= 32) {
 						const oldPortNo = portNo;
 						const midiCh = gt - 1;	// The internal representations of MIDI CH. are different between track headers and event.
@@ -950,7 +1338,7 @@ export function convertRcmToSeq(rcm) {
 					}
 					break;
 
-				case 0xe7:	// TEMPO
+				case EVENT.TEMPO:
 					if (gt === 0) {
 						throw new Error(`Invalid tempo rate ${gt}`);
 					}
@@ -961,24 +1349,24 @@ export function convertRcmToSeq(rcm) {
 					}
 					break;
 
-				case 0xf5:	// Music Key
+				case EVENT.MusicKey:
 					setSeq(conductorTrack, timestamp, makeKeySignature(st));
 					st = 0;
 					break;
 
-				case 0xf6:	// Comment
+				case EVENT.Comment:
 					setSeq(smfTrack, timestamp, makeText(0x01, event.slice(1)));
 					st = 0;
 					break;
 
-				case 0x99:	// External Command
+				case EVENT.ExtCmd:
 					{
 						const kind = (event[2] === 0x00) ? 'MCI: ' : (event[2] === 0x01) ? 'RUN: ' : '???: ';
 						setSeq(conductorTrack, timestamp, makeText(0x07, [...strToBytes(kind), ...event.slice(4)]));
 					}
 					break;
 
-				case 0xe5:	// KeyScan
+				case EVENT.KeyScan:
 					{
 						const cue = {
 							12: 'suspend playing',
@@ -1010,90 +1398,89 @@ export function convertRcmToSeq(rcm) {
 					break;
 
 				// RCM commands
-				case 0xf7:	// 2nd Event
-				case 0xf8:	// Loop End
-				case 0xf9:	// Loop Start
-				case 0xfc:	// Same Measure
+				case EVENT.SecondEvt:
+				case EVENT.LoopEnd:
+				case EVENT.LoopStart:
+				case EVENT.SameMeas:
 					console.assert(false, 'Such kind of events must be resolved in the previous phase', {event});
 					break;
 
-				case 0xfd:	// Measure End
+				case EVENT.MeasEnd:
 					st = 0;
 					break;
-				case 0xfe:	// End of Track
+				case EVENT.TrackEnd:
 					// Expands the current step time to wait for all of note-off.
-					st = Math.max(...noteGts);
-					console.assert(st >= 0);
+					st = Math.max(...noteGts, 0);
 					break;
 
 				// Special commands for particular devices
-				case 0xc0:	// DX7FUNC
+				case EVENT.DX7FUNC:
 					throwUnless7bit(gt, vel);
 					setSeq(smfTrack, timestamp, [0xf0, 0x43, 0x11, 0x08, gt, vel, 0xf7]);
 					break;
-				case 0xc1:	// DX.PARA
+				case EVENT.DX_PARA:
 					throwUnless7bit(gt, vel);
 					setSeq(smfTrack, timestamp, [0xf0, 0x43, 0x11, 0x00, gt, vel, 0xf7]);
 					break;
-				case 0xc2:	// DX.PERF
+				case EVENT.DX_PERF:
 					throwUnless7bit(gt, vel);
 					setSeq(smfTrack, timestamp, [0xf0, 0x43, 0x11, 0x04, gt, vel, 0xf7]);
 					break;
-				case 0xc3:	// TX.FUNC
+				case EVENT.TX_FUNC:
 					throwUnless7bit(gt, vel);
 					setSeq(smfTrack, timestamp, [0xf0, 0x43, 0x11, 0x11, gt, vel, 0xf7]);
 					break;
-				case 0xc5:	// FB-01 P
+				case EVENT.FB_01_P:
 					throwUnless7bit(gt, vel);
 					setSeq(smfTrack, timestamp, [0xf0, 0x43, 0x11, 0x15, gt, vel, 0xf7]);
 					break;
-				case 0xc6:	// FB-01 S
+				case EVENT.FB_01_S:
 					throwUnless7bit(gt, vel);
 					setSeq(smfTrack, timestamp, [0xf0, 0x43, 0x75, 0x01, 0x10, gt, vel, 0xf7]);
 					break;
-				case 0xc7:	// TX81Z V
+				case EVENT.TX81Z_V:
 					throwUnless7bit(gt, vel);
 					setSeq(smfTrack, timestamp, [0xf0, 0x43, 0x11, 0x12, gt, vel, 0xf7]);
 					break;
-				case 0xc8:	// TX81Z A
+				case EVENT.TX81Z_A:
 					throwUnless7bit(gt, vel);
 					setSeq(smfTrack, timestamp, [0xf0, 0x43, 0x11, 0x13, gt, vel, 0xf7]);
 					break;
-				case 0xc9:	// TX81Z P
+				case EVENT.TX81Z_P:
 					throwUnless7bit(gt, vel);
 					setSeq(smfTrack, timestamp, [0xf0, 0x43, 0x11, 0x10, gt, vel, 0xf7]);
 					break;
-				case 0xca:	// TX81Z S
+				case EVENT.TX81Z_S:
 					throwUnless7bit(gt, vel);
 					setSeq(smfTrack, timestamp, [0xf0, 0x43, 0x11, 0x10, 0x7b, gt, vel, 0xf7]);
 					break;
-				case 0xcb:	// TX81Z E
+				case EVENT.TX81Z_E:
 					throwUnless7bit(gt, vel);
 					setSeq(smfTrack, timestamp, [0xf0, 0x43, 0x11, 0x10, 0x7c, gt, vel, 0xf7]);
 					break;
-				case 0xcc:	// DX7-2 R
+				case EVENT.DX7_2_R:
 					throwUnless7bit(gt, vel);
 					setSeq(smfTrack, timestamp, [0xf0, 0x43, 0x11, 0x1b, gt, vel, 0xf7]);
 					break;
-				case 0xcd:	// DX7-2 A
+				case EVENT.DX7_2_A:
 					throwUnless7bit(gt, vel);
 					setSeq(smfTrack, timestamp, [0xf0, 0x43, 0x11, 0x18, gt, vel, 0xf7]);
 					break;
-				case 0xce:	// DX7-2 P
+				case EVENT.DX7_2_P:
 					throwUnless7bit(gt, vel);
 					setSeq(smfTrack, timestamp, [0xf0, 0x43, 0x11, 0x19, gt, vel, 0xf7]);
 					break;
-				case 0xcf:	// TX802 P
+				case EVENT.TX802_P:
 					throwUnless7bit(gt, vel);
 					setSeq(smfTrack, timestamp, [0xf0, 0x43, 0x11, 0x1a, gt, vel, 0xf7]);
 					break;
-				case 0xdc:	// MKS-7
+				case EVENT.MKS_7:
 					throwUnless7bit(gt, vel);
 					setSeq(smfTrack, timestamp, [0xf0, 0x41, 0x32, 0x01, gt, vel, 0xf7]);
 					break;
 
 				default:
-					console.warn(`${cmd.toString(16)}: Unknown command.`);
+					console.warn(`Unknown command: ${event.map((e) => e.toString(16).padStart(2, '0')).join(' ')}. Ignored.`);
 					st = 0;
 					break;
 				}
@@ -1103,14 +1490,13 @@ export function convertRcmToSeq(rcm) {
 			if (chNo >= 0) {
 				for (let noteNo = 0; noteNo < noteGts.length; noteNo++) {
 					const noteGt = noteGts[noteNo];
-					console.assert(noteGt >= 0);
-					if (noteGt === 0) {
+					if (noteGt < 0) {
 						continue;
 					}
 
-					if (noteGt <= st) {
+					if (isNoteOff(noteGt, st)) {
 						setSeq(smfTrack, timestamp + noteGt, [0x90 | chNo, noteNo, 0]);
-						noteGts[noteNo] = 0;
+						noteGts[noteNo] = -1;
 					} else {
 						noteGts[noteNo] -= st;
 					}
@@ -1331,7 +1717,7 @@ function rawTrim(buf) {
 	}
 
 	const begin = buf.findIndex((e) => e !== 0x20);
-	const end = String.fromCodePoint(...buf).replace(/\x20+$/u, '').length;
+	const end = String.fromCharCode(...buf).replace(/\x20+$/u, '').length;
 	console.assert(begin < end);
 
 	return buf.slice(begin, end);

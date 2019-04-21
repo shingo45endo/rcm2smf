@@ -78,6 +78,7 @@
 		"max-statements": "off",
 		"multiline-comment-style": "off",
 		"multiline-ternary": "off",
+		"newline-per-chained-call": "off",
 		"no-await-in-loop": "off",
 		"no-bitwise": "off",
 		"no-confusing-arrow": "off",
