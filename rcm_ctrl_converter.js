@@ -31,6 +31,8 @@ export const [convertMTDToSysEx, convertCM6ToSysEx] = ['MTD', 'CM6'].map((kind) 
 		},
 	}[kind];
 
+	const makeSysExMTCM = (bytes, addrH, addrM, addrL) => makeSysEx(bytes, 0x16, addrH, addrM, addrL);
+
 	return (buf) => {
 		// Checks the file header.
 		console.assert(pos.totalSize);
@@ -50,69 +52,62 @@ export const [convertMTDToSysEx, convertCM6ToSysEx] = ['MTD', 'CM6'].map((kind) 
 		console.assert(pos.la);
 
 		// System Area
-		sysExs.push(makeSysEx(buf.slice(pos.la.SystemArea, pos.la.SystemArea + 0x17), 0x10, 0x00, 0x00));
+		sysExs.push(makeSysExMTCM(buf.slice(pos.la.SystemArea, pos.la.SystemArea + 0x17), 0x10, 0x00, 0x00));
 
 		// Timbre Memory (#1 - #64)
 		for (let i = 0; i < 64; i++) {
 			const index = pos.la.TimbreMemory + i * 0x100;
-			sysExs.push(makeSysEx(buf.slice(index, index + 0x100), 0x08, i * 2, 0x00));
+			sysExs.push(makeSysExMTCM(buf.slice(index, index + 0x100), 0x08, i * 2, 0x00));
 		}
 
 		// Rhythm Setup Temporary Area
-		sysExs.push(makeSysEx(buf.slice(pos.la.RhythmSetupTemp, pos.la.RhythmSetupTemp + 0x4 * 64), 0x03, 0x01, 0x10));	// #24 - #87
+		sysExs.push(makeSysExMTCM(buf.slice(pos.la.RhythmSetupTemp, pos.la.RhythmSetupTemp + 0x4 * 64), 0x03, 0x01, 0x10));	// #24 - #87
 		if (pos.la.RhythmSetupTemp2) {
-			sysExs.push(makeSysEx(buf.slice(pos.la.RhythmSetupTemp2, pos.la.RhythmSetupTemp2 + 0x4 * 21), 0x03, 0x03, 0x10));	// #88 - #108
+			sysExs.push(makeSysExMTCM(buf.slice(pos.la.RhythmSetupTemp2, pos.la.RhythmSetupTemp2 + 0x4 * 21), 0x03, 0x03, 0x10));	// #88 - #108
 		}
 
 		// Patch Temporary Area
-		sysExs.push(makeSysEx(buf.slice(pos.la.PatchTempArea, pos.la.PatchTempArea + 0x10 * 9), 0x03, 0x00, 0x00));
+		sysExs.push(makeSysExMTCM(buf.slice(pos.la.PatchTempArea, pos.la.PatchTempArea + 0x10 * 9), 0x03, 0x00, 0x00));
 
 		// Timbre Temporary Area
 		for (let i = 0; i < 8; i++) {
 			const addr = i * 0xf6;	// 0xf6: 0x0e + 0x3a * 4
 			const index = pos.la.TimbreTempArea + addr;
-			sysExs.push(makeSysEx(buf.slice(index, index + 0xf6), 0x04, addr >> 7, addr & 0x7f));
+			sysExs.push(makeSysExMTCM(buf.slice(index, index + 0xf6), 0x04, addr >> 7, addr & 0x7f));
 		}
 
 		// Patch Memory (#1 - #128)
 		for (let i = 0; i < 8; i++) {
 			const index = pos.la.PatchMemory + i * 0x8 * 16;
-			sysExs.push(makeSysEx(buf.slice(index, index + 0x8 * 16), 0x05, i, 0x00));
+			sysExs.push(makeSysExMTCM(buf.slice(index, index + 0x8 * 16), 0x05, i, 0x00));
 		}
 
 		// User Patch (Only for MTD)
 		if (pos.la.UserPatch) {
 			for (let i = 0; i < 4; i++) {
 				const index = pos.la.UserPatch + i * 0x8 * 16;
-				sysExs.push(makeSysEx(buf.slice(index, index + 0x8 * 16), 0x05, i, 0x00));
+				sysExs.push(makeSysExMTCM(buf.slice(index, index + 0x8 * 16), 0x05, i, 0x00));
 			}
 		}
 
 		// [PCM SOUND PART]
 		if (pos.pcm) {
 			// Patch Temporary Area
-			sysExs.push(makeSysEx(buf.slice(pos.pcm.PatchTempArea, pos.pcm.PatchTempArea + 0x15 * 6), 0x50, 0x00, 0x00));
+			sysExs.push(makeSysExMTCM(buf.slice(pos.pcm.PatchTempArea, pos.pcm.PatchTempArea + 0x15 * 6), 0x50, 0x00, 0x00));
 
 			// Patch Memory (#1 - #128)
 			for (let i = 0; i < 16; i++) {
 				const addr = i * 0x13 * 8;
 				const index = pos.pcm.PatchMemory + addr;
-				sysExs.push(makeSysEx(buf.slice(index, index + 0x13 * 8), 0x51, addr >> 7, addr & 0x7f));
+				sysExs.push(makeSysExMTCM(buf.slice(index, index + 0x13 * 8), 0x51, addr >> 7, addr & 0x7f));
 			}
 
 			// System Area
-			sysExs.push(makeSysEx(buf.slice(pos.pcm.SystemArea, pos.pcm.SystemArea + 0x11), 0x52, 0x00, 0x00));
+			sysExs.push(makeSysExMTCM(buf.slice(pos.pcm.SystemArea, pos.pcm.SystemArea + 0x11), 0x52, 0x00, 0x00));
 		}
 
 		console.assert(sysExs.every((e) => e.length <= 256 + 10), 'Too long SysEx', {sysExs});
 		return sysExs;
-
-		function makeSysEx(bytes, addrH, addrM, addrL) {
-			console.assert([addrH, addrM, addrL].every((e) => (0x00 <= e && e < 0x80)), 'Invalid address', {addrH, addrM, addrL});
-			const sysEx = [0xf0, 0x41, 0x10, 0x16, 0x12, addrH, addrM, addrL, ...bytes, 0, 0xf7];
-			sysEx[sysEx.length - 2] = checkSum(sysEx.slice(5, -2));
-			return sysEx;
-		}
 	};
 });
 
@@ -124,28 +119,29 @@ export function convertGSDToSysEx(buf) {
 		return null;
 	}
 
+	const makeSysExGS = (bytes, addrH, addrM, addrL) => makeSysEx(bytes, 0x42, addrH, addrM, addrL);
 	const sysExs = [];
 
 	// Master Tune
-	sysExs.push(makeSysEx(buf.slice(0x0020, 0x0024), 0x40, 0x00, 0x00));
+	sysExs.push(makeSysExGS(buf.slice(0x0020, 0x0024), 0x40, 0x00, 0x00));
 
 	// Master Volume, Master Key Shift, and Master Panpot
 	for (let i = 0; i < 3; i++) {
-		sysExs.push(makeSysEx([buf[0x0024 + i]], 0x40, 0x00, 0x04 + i));
+		sysExs.push(makeSysExGS([buf[0x0024 + i]], 0x40, 0x00, 0x04 + i));
 	}
 
 	// Reverb
 	for (let i = 0; i < 7; i++) {
-		sysExs.push(makeSysEx([buf[0x0027 + i]], 0x40, 0x01, 0x30 + i));
+		sysExs.push(makeSysExGS([buf[0x0027 + i]], 0x40, 0x01, 0x30 + i));
 	}
 
 	// Chorus
 	for (let i = 0; i < 8; i++) {
-		sysExs.push(makeSysEx([buf[0x002e + i]], 0x40, 0x01, 0x38 + i));
+		sysExs.push(makeSysExGS([buf[0x002e + i]], 0x40, 0x01, 0x38 + i));
 	}
 
 	// Voice Reserve
-	sysExs.push(makeSysEx([0x04f9, 0x00af, 0x0129, 0x01a3, 0x021d, 0x0297, 0x0311, 0x038b, 0x0405, 0x047f, 0x0573, 0x05ed, 0x0667, 0x06e1, 0x075b, 0x07d5].map((e) => buf[e]), 0x40, 0x01, 0x10));
+	sysExs.push(makeSysExGS([0x04f9, 0x00af, 0x0129, 0x01a3, 0x021d, 0x0297, 0x0311, 0x038b, 0x0405, 0x047f, 0x0573, 0x05ed, 0x0667, 0x06e1, 0x075b, 0x07d5].map((e) => buf[e]), 0x40, 0x01, 0x10));
 
 	// Patch Parameter
 	for (let i = 0; i < 16; i++) {
@@ -165,14 +161,14 @@ export function convertGSDToSysEx(buf) {
 			return p;
 		}, [[...zeroes], [...zeroes], [...zeroes], [...zeroes]]);
 
-		sysExs.push(makeSysEx(nibblize(...level.slice(0, 64)),  0x49, 0x02 + i * 0x10, 0x00));
-		sysExs.push(makeSysEx(nibblize(...level.slice(64)),     0x49, 0x03 + i * 0x10, 0x00));
-		sysExs.push(makeSysEx(nibblize(...panpot.slice(0, 64)), 0x49, 0x06 + i * 0x10, 0x00));
-		sysExs.push(makeSysEx(nibblize(...panpot.slice(64)),    0x49, 0x07 + i * 0x10, 0x00));
-		sysExs.push(makeSysEx(nibblize(...reverb.slice(0, 64)), 0x49, 0x08 + i * 0x10, 0x00));
-		sysExs.push(makeSysEx(nibblize(...reverb.slice(64)),    0x49, 0x09 + i * 0x10, 0x00));
-		sysExs.push(makeSysEx(nibblize(...chorus.slice(0, 64)), 0x49, 0x0a + i * 0x10, 0x00));
-		sysExs.push(makeSysEx(nibblize(...chorus.slice(64)),    0x49, 0x0b + i * 0x10, 0x00));
+		sysExs.push(makeSysExGS(nibblize(...level.slice(0, 64)),  0x49, 0x02 + i * 0x10, 0x00));
+		sysExs.push(makeSysExGS(nibblize(...level.slice(64)),     0x49, 0x03 + i * 0x10, 0x00));
+		sysExs.push(makeSysExGS(nibblize(...panpot.slice(0, 64)), 0x49, 0x06 + i * 0x10, 0x00));
+		sysExs.push(makeSysExGS(nibblize(...panpot.slice(64)),    0x49, 0x07 + i * 0x10, 0x00));
+		sysExs.push(makeSysExGS(nibblize(...reverb.slice(0, 64)), 0x49, 0x08 + i * 0x10, 0x00));
+		sysExs.push(makeSysExGS(nibblize(...reverb.slice(64)),    0x49, 0x09 + i * 0x10, 0x00));
+		sysExs.push(makeSysExGS(nibblize(...chorus.slice(0, 64)), 0x49, 0x0a + i * 0x10, 0x00));
+		sysExs.push(makeSysExGS(nibblize(...chorus.slice(64)),    0x49, 0x0b + i * 0x10, 0x00));
 	}
 
 	// Master Fine Tune and Master Course Tuning
@@ -186,13 +182,6 @@ export function convertGSDToSysEx(buf) {
 			p.push((c >> 4) & 0x0f, c & 0x0f);
 			return p;
 		}, []);
-	}
-
-	function makeSysEx(bytes, addrH, addrM, addrL) {
-		console.assert([addrH, addrM, addrL].every((e) => (0x00 <= e && e < 0x80)), 'Invalid address', {addrH, addrM, addrL});
-		const sysEx = [0xf0, 0x41, 0x10, 0x42, 0x12, addrH, addrM, addrL, ...bytes, 0, 0xf7];
-		sysEx[sysEx.length - 2] = checkSum(sysEx.slice(5, -2));
-		return sysEx;
 	}
 
 	function makeSysExsForPatch(bytes, addrH, addrM, addrL) {
@@ -257,17 +246,19 @@ export function convertGSDToSysEx(buf) {
 		console.assert(nibbles.every((e) => (0x0 <= e && e < 0x10)), 'Invalid SysEx nibble', {nibbles});
 
 		// Divides the whole data by 2 packets.
-		return [0, 1].map((i) => {
-			const packet = nibbles.slice(i * 128, (i + 1) * 128);
-			const sysEx = [0xf0, 0x41, 0x10, 0x42, 0x12, addrH, addrM + i, addrL, ...packet, 0, 0xf7];
-			sysEx[sysEx.length - 2] = checkSum(sysEx.slice(5, -2));
-			return sysEx;
-		});
+		return [0, 1].map((i) => makeSysExGS(nibbles.slice(i * 128, (i + 1) * 128), addrH, addrM + i, addrL));
 	}
 }
 
-function checkSum(bytes) {
-	console.assert(bytes && bytes.length, 'Invalid argument', {bytes});
-	const sum = bytes.reduce((p, c) => p + c, 0);
-	return (0x80 - (sum & 0x7f)) & 0x7f;
+function makeSysEx(bytes, modelId, addrH, addrM, addrL) {
+	console.assert([modelId, addrH, addrM, addrL].every((e) => (0x00 <= e && e < 0x80)), 'Invalid address', {addrH, addrM, addrL});
+	const sysEx = [0xf0, 0x41, 0x10, modelId, 0x12, addrH, addrM, addrL, ...bytes, -1, 0xf7];
+	sysEx[sysEx.length - 2] = checkSum(sysEx.slice(5, -2));
+	return sysEx;
+
+	function checkSum(bytes) {
+		console.assert(bytes && bytes.length, 'Invalid argument', {bytes});
+		const sum = bytes.reduce((p, c) => p + c, 0);
+		return (0x80 - (sum & 0x7f)) & 0x7f;
+	}
 }
