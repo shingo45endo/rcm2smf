@@ -57,7 +57,7 @@ export const [convertMTDToSysEx, convertCM6ToSysEx] = ['MTD', 'CM6'].map((kind) 
 		// Timbre Memory (#1 - #64)
 		for (let i = 0; i < 64; i++) {
 			const index = pos.la.TimbreMemory + i * 0x100;
-			sysExs.push(makeSysExMTCM(buf.slice(index, index + 0x100), 0x08, i * 2, 0x00));
+			sysExs.push(makeSysExMTCM(buf.slice(index, index + 0xf6), 0x08, i * 2, 0x00));
 		}
 
 		// Rhythm Setup Temporary Area
