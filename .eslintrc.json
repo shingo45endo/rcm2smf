@@ -41,6 +41,7 @@
 		],
 		"no-mixed-spaces-and-tabs": ["error", "smart-tabs"],
 		"no-use-before-define": ["error", "nofunc"],
+		"no-unused-vars": ["error", {"argsIgnorePattern": "^_$"}],
 		"prefer-destructuring": ["error",
 			{
 				"VariableDeclarator": {
