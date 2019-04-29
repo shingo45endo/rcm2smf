@@ -818,10 +818,10 @@ export function isSysExRedundant(bytes) {
 	}
 
 	// Parses the SysEx.
-	const [f0, mfrId, deviceId, modelId, command, addrH, addrM, addrL, ...payload] = bytes;
-	const f7 = payload.pop();
+	const [tmpF0, mfrId, deviceId, modelId, command, addrH, addrM, addrL, ...payload] = bytes;
+	const tmpF7 = payload.pop();
 	const sum = payload.pop();
-	console.assert(f0 === 0xf0 && f7 === 0xf7);
+	console.assert(tmpF0 === 0xf0 && tmpF7 === 0xf7);
 
 	// Checks whether the SysEx is DT1 for Roland.
 	if (mfrId !== 0x41 || deviceId !== 0x10 || command !== 0x12) {
