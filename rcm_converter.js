@@ -1,4 +1,4 @@
-import {convertMTDToSysEx, convertCM6ToSysEx, convertGSDToSysEx} from './rcm_ctrl_converter.js';
+import {convertMTDToSysEx, convertCM6ToSysEx, convertGSDToSysEx, isSysExRedundant} from './rcm_ctrl_converter.js';
 
 // Settings (TODO: Can be specified from users)
 const defaultSettings = {
@@ -815,6 +815,10 @@ export function convertRcmToSeq(rcm) {
 	if (rcm.header.sysExsMTD || rcm.header.sysExsCM6 || rcm.header.sysExsGSD || rcm.header.sysExsGSD2) {
 		// Gathers all the SysExs.
 		const allSysExs = [];
+		if (rcm.header.sysExsMTD || rcm.header.sysExsCM6) {
+			// Inserts a reset SysEx.
+			allSysExs.push([0xf0, 0x41, 0x10, 0x16, 0x12, 0x7f, 0x00, 0x00, 0x00, 0x01, 0xf7]);
+		}
 		if (rcm.header.sysExsMTD) {
 			// Removes redundant SysEx. (For User Patch)
 			const keys = new Set();
@@ -826,22 +830,32 @@ export function convertRcmToSeq(rcm) {
 				}
 				return p;
 			}, []);
+			// Adds SysEx from MTD file.
 			allSysExs.push(...newSysExs);
-		}
-		if (rcm.header.sysExsCM6) {
+		} else if (rcm.header.sysExsCM6) {
+			// Adds SysEx from CM6 file.
 			allSysExs.push(...rcm.header.sysExsCM6);
 		}
+		if (rcm.header.sysExsGSD || rcm.header.sysExsGSD2) {
+			// Inserts GS reset SysEx.
+			allSysExs.push([0xf0, 0x41, 0x10, 0x42, 0x12, 0x40, 0x00, 0x7f, 0x00, 0x41, 0xf7]);
+		}
 		if (rcm.header.sysExsGSD) {
+			// Adds SysEx from GSd file.
 			allSysExs.push(...rcm.header.sysExsGSD);
 		}
 		if (rcm.header.sysExsGSD2) {
+			// Adds SysEx from GSD2 file.
 			// TODO: Support >16ch
 			allSysExs.push(...rcm.header.sysExsGSD2);
 		}
 
+		// Removes unnecessary SysEx.
+		const sysExs = allSysExs.filter((e) => !isSysExRedundant(e));
+
 		// Decides each interval between SysExs.
 		const extraSt = calcSetupMeasureLength(smfBeat.n, smfBeat.d, seq.timeBase);
-		const timings = spaceEachSysEx(allSysExs, extraSt, seq.timeBase);
+		const timings = spaceEachSysEx(sysExs, extraSt, seq.timeBase);
 		const maxUsecPerBeat = Math.max(...timings.map((e) => e.usecPerBeat));
 
 		// Sets tempo slow during the setup measure.
