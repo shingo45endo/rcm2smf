@@ -731,39 +731,84 @@ function calcSetupMeasureLength(beatN, beatD, timeBase/* , minTick = 0 */) {	// 
 	return measureLen;
 }
 
-function spaceEachSysEx(sysExs, totalTick, timeBase) {
+function spaceEachSysEx(sysExs, maxTick, timeBase) {
 	console.assert(sysExs && sysExs.length, 'Invalid argument', {sysExs});
-	console.assert(sysExs.length <= totalTick, 'Too many SysEx', {sysExs});
-	console.assert(totalTick >= timeBase, 'Too small tick time', {totalTick, timeBase});
+	console.assert(sysExs.length <= maxTick, 'Too many SysEx', {sysExs});
+	console.assert(maxTick >= timeBase, 'Too small tick time', {totalTick: maxTick, timeBase});
 
-	// Calculates each tick time from the ratio of the size of each SysEx to the total size of SysEx.
-	const totalBytes = sysExs.reduce((p, c) => p + c.length, 0);
+	// Calculates the time required for sending and executing each of SysEx.
 	const timings = sysExs.map((sysEx) => {
-		const tick = Math.max(Math.trunc(sysEx.length * totalTick / totalBytes), 1);
-		const usecPerBeat = getUsecPerBeat(sysEx.length, tick);
-		return {sysEx, tick, usecPerBeat};
+		// Transmit time of SysEx
+		let usec = sysEx.length * (8 + 1 + 1) * 1000 * 1000 / 31250.0;
+
+		// Additional wait time
+		const [tmpF0, mfrId, deviceId, modelId, command, addrH, addrM, addrL, ...rest] = sysEx;
+		console.assert(tmpF0 === 0xf0);
+		console.assert(rest[rest.length - 1] === 0xf7);
+		let isReset = false;
+		if (mfrId === 0x41 && deviceId === 0x10 && command === 0x12) {
+			switch (modelId) {
+			case 0x16:	// MT-32, CM-64
+				if (addrH === 0x7f) {
+					// Waits for reset.
+					// Note: If the wait time is too short, "Exc. Buffer overflow" error occurs when receiving next SysEx. (confirmed on Ver.1.07)
+					usec += 420 * 1000;
+					isReset = true;
+				} else if (0x00 < addrH && addrH <= 0x20) {
+					// It is said that MT-32 Ver.1.xx requires 40 msec of delay between SysExs.
+					// Note: Is it really needed for the later version of MT-32 and its upper compatible LA modules like CM-32L and CM-64?
+					usec += 40 * 1000;
+				} else {
+					// DT1 needs more than 20 msec time interval.
+					usec += 20 * 1000;
+				}
+				break;
+			case 0x42:	// GS
+				if (addrH === 0x40 && addrM === 0x00 && addrL === 0x7f) {
+					// Waits for GS reset.
+					usec += 50 * 1000;
+					isReset = true;
+				} else {
+					// DT1 needs more than 20 msec time interval.
+					usec += 20 * 1000;
+				}
+				break;
+			default:
+				console.assert(false);
+				break;
+			}
+		}
+
+		return {sysEx, usec, isReset};
+	});
+
+	// Calculates each tick time from the ratio of the time of each SysEx to the total time of SysEx.
+	const totalUsec = timings.reduce((p, c) => p + c.usec, 0);
+	timings.forEach((e) => {
+		e.tick = Math.max(Math.trunc(e.usec * maxTick / totalUsec), 1);
+		e.usecPerBeat = e.usec * timeBase / e.tick;
 	});
 
 	// Decreases each tick time to set all SysEx with in given time frame.
-	while (getTotalTick(timings) > totalTick) {
+	while (getTotalTick(timings) > maxTick) {
 		const minUsecPerBeat = Math.min(...timings.filter((e) => e.tick > 1).map((e) => e.usecPerBeat));
 		timings.filter((e) => e.usecPerBeat === minUsecPerBeat).forEach((e) => {
 			e.tick--;
 			console.assert(e.tick > 0);
-			e.usecPerBeat = getUsecPerBeat(e.sysEx.length, e.tick);
+			e.usecPerBeat = e.usec * timeBase / e.tick;
 		});
 	}
 
 	// Increases each tick time to make tempo faster as much as possible.
-	while (getTotalTick(timings) < totalTick) {
+	while (getTotalTick(timings) < maxTick) {
 		const maxUsecPerBeat = Math.max(...timings.map((e) => e.usecPerBeat));
 		const elems = timings.filter((e) => e.usecPerBeat === maxUsecPerBeat);
-		if (getTotalTick(timings) + elems.length > totalTick) {
+		if (getTotalTick(timings) + elems.length > maxTick) {
 			break;
 		}
 		elems.forEach((e) => {
 			e.tick++;
-			e.usecPerBeat = getUsecPerBeat(e.sysEx.length, e.tick);
+			e.usecPerBeat = e.usec * timeBase / e.tick;
 		});
 	}
 
@@ -771,10 +816,6 @@ function spaceEachSysEx(sysExs, totalTick, timeBase) {
 
 	function getTotalTick(timings) {
 		return timings.reduce((p, c) => p + c.tick, 0);
-	}
-
-	function getUsecPerBeat(size, tick) {
-		return Math.trunc(size * 320 * timeBase / tick);
 	}
 }
 
