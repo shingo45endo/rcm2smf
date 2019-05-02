@@ -714,21 +714,19 @@ function extractRhythm(seqEvents, patternEvents) {
 	return extractedEvents;
 }
 
-function calcSetupMeasureLength(beatN, beatD, timeBase/* , minTick = 0 */) {	// TODO: Consider minTick
+function calcSetupMeasureTick(beatN, beatD, timeBase, minTick) {
 	console.assert(Number.isInteger(Math.log2(beatD)), 'Invalid argument', {beatD});
 
-	if ((beatN === 3 && beatD === 4) || (beatN === 6 && beatD === 8)) {
-		return timeBase * 3;	// Special case
+	const requiredTick = ((beatN === 3 && beatD === 4) || (beatN === 6 && beatD === 8)) ? timeBase * 3 : timeBase * 4;
+	const unit = beatN * timeBase * 4 / beatD;
+
+	let setupTick = unit * Math.trunc(requiredTick / unit);
+	while (setupTick < requiredTick || setupTick < minTick) {
+		setupTick += unit;
 	}
 
-	const unit = timeBase * 4 / beatD;
-	let measureLen = unit * beatN;
-	while (measureLen < timeBase * 4) {
-		measureLen += unit;
-	}
-
-	console.assert(Number.isInteger(measureLen) && measureLen % timeBase === 0);
-	return measureLen;
+	console.assert(Number.isInteger(setupTick));
+	return setupTick;
 }
 
 function spaceEachSysEx(sysExs, maxTick, timeBase) {
@@ -833,6 +831,7 @@ export function convertRcmToSeq(rcm) {
 		smfBeat.d = rcm.header.beatD;
 		smfBeat.n = rcm.header.beatN;
 	}
+	const usecPerBeat = 60 * 1000 * 1000 / rcm.header.tempo;
 
 	// Adds meta events to the conductor track.
 	const conductorTrack = new Map();
@@ -854,8 +853,24 @@ export function convertRcmToSeq(rcm) {
 
 	// Adds a setup measure which consists of SysEx converted from control files.
 	if (rcm.header.sysExsMTD || rcm.header.sysExsCM6 || rcm.header.sysExsGSD || rcm.header.sysExsGSD2) {
-		// Gathers all the SysExs.
 		const allSysExs = [];
+
+		// Adds SysEx for GS.
+		if (rcm.header.sysExsGSD || rcm.header.sysExsGSD2) {
+			// Inserts GS reset SysEx.
+			allSysExs.push([0xf0, 0x41, 0x10, 0x42, 0x12, 0x40, 0x00, 0x7f, 0x00, 0x41, 0xf7]);
+		}
+		if (rcm.header.sysExsGSD) {
+			// Adds SysEx from GSD file.
+			allSysExs.push(...rcm.header.sysExsGSD);
+		}
+		if (rcm.header.sysExsGSD2) {
+			// Adds SysEx from GSD2 file.
+			// TODO: Support >16ch
+			allSysExs.push(...rcm.header.sysExsGSD2);
+		}
+
+		// Adds SysEx for MT-32/CM-64.
 		if (rcm.header.sysExsMTD || rcm.header.sysExsCM6) {
 			// Inserts a reset SysEx.
 			allSysExs.push([0xf0, 0x41, 0x10, 0x16, 0x12, 0x7f, 0x00, 0x00, 0x00, 0x01, 0xf7]);
@@ -877,30 +892,19 @@ export function convertRcmToSeq(rcm) {
 			// Adds SysEx from CM6 file.
 			allSysExs.push(...rcm.header.sysExsCM6);
 		}
-		if (rcm.header.sysExsGSD || rcm.header.sysExsGSD2) {
-			// Inserts GS reset SysEx.
-			allSysExs.push([0xf0, 0x41, 0x10, 0x42, 0x12, 0x40, 0x00, 0x7f, 0x00, 0x41, 0xf7]);
-		}
-		if (rcm.header.sysExsGSD) {
-			// Adds SysEx from GSd file.
-			allSysExs.push(...rcm.header.sysExsGSD);
-		}
-		if (rcm.header.sysExsGSD2) {
-			// Adds SysEx from GSD2 file.
-			// TODO: Support >16ch
-			allSysExs.push(...rcm.header.sysExsGSD2);
-		}
 
 		// Removes unnecessary SysEx.
 		const sysExs = allSysExs.filter((e) => !isSysExRedundant(e));
 
 		// Decides each interval between SysExs.
-		const extraSt = calcSetupMeasureLength(smfBeat.n, smfBeat.d, seq.timeBase);
+		const extraSt = calcSetupMeasureTick(smfBeat.n, smfBeat.d, seq.timeBase, sysExs.length);
 		const timings = spaceEachSysEx(sysExs, extraSt, seq.timeBase);
 		const maxUsecPerBeat = Math.max(...timings.map((e) => e.usecPerBeat));
 
-		// Sets tempo slow during the setup measure.
-		setSeq(conductorTrack, startTime, makeTempo(maxUsecPerBeat));
+		// Sets tempo slow during sending SysExs if necessary.
+		if (maxUsecPerBeat > usecPerBeat) {
+			setSeq(conductorTrack, 0, makeTempo(maxUsecPerBeat));
+		}
 
 		// Inserts SysExs from control files
 		let timestamp = startTime;
@@ -909,11 +913,17 @@ export function convertRcmToSeq(rcm) {
 			timestamp += timing.tick;
 		}
 
-		startTime += extraSt;
-	}
+		// Sets original tempo.
+		if (maxUsecPerBeat > usecPerBeat) {
+			setSeq(conductorTrack, timestamp, makeTempo(usecPerBeat));
+		}
 
-	// Set Tempo
-	setSeq(conductorTrack, startTime, makeTempo(60 * 1000 * 1000 / rcm.header.tempo));
+		startTime += extraSt;
+
+	} else {
+		// Set Tempo
+		setSeq(conductorTrack, 0, makeTempo(usecPerBeat));
+	}
 
 	// Converts each track.
 	const EVENT = (rcm.header.isMCP) ? EVENT_MCP : EVENT_RCP;
@@ -1316,7 +1326,6 @@ export function convertRcmToSeq(rcm) {
 		}
 	}
 
-	// TODO: Support "overwrite" when some kind of "global" meta event is added at the same timestamp. (e.g. Set Tempo)
 	function setSeq(map, timestamp, mes) {
 		console.assert(map instanceof Map, 'Invalid argument', {map});
 		console.assert(Number.isInteger(timestamp), 'Invalid argument', {timestamp});
