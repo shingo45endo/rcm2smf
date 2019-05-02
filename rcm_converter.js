@@ -975,29 +975,40 @@ export function convertRcmToSeq(rcm) {
 			} else {
 				// Command event
 				switch (cmd) {
-				// SysEx
-				case EVENT.UsrExc0:
-				case EVENT.UsrExc1:
-				case EVENT.UsrExc2:
-				case EVENT.UsrExc3:
-				case EVENT.UsrExc4:
-				case EVENT.UsrExc5:
-				case EVENT.UsrExc6:
-				case EVENT.UsrExc7:
-					throwUnless7bit(gt, vel);
-					{
-						const {bytes, memo} = rcm.header.userSysExs[cmd - 0x90];
-						setSeq(smfTrack, timestamp, makeText(0x01, rawTrim(memo)));
-						setSeq(smfTrack, timestamp, makeSysEx(bytes, chNo, gt, vel));
+				// MIDI messages
+				case EVENT.CONTROL:
+					if (chNo >= 0) {
+						throwUnless7bit(gt, vel);
+						setSeq(smfTrack, timestamp, [0xb0 | chNo, gt, vel]);
 					}
 					break;
-				case EVENT.TrExcl:
-					throwUnless7bit(gt, vel);
-					setSeq(smfTrack, timestamp, makeSysEx(event.slice(4), chNo, gt, vel));
+				case EVENT.PITCH:
+					if (chNo >= 0) {
+						throwUnless7bit(gt, vel);
+						setSeq(smfTrack, timestamp, [0xe0 | chNo, gt, vel]);
+					}
+					break;
+				case EVENT.AFTER_C:
+					if (chNo >= 0) {
+						throwUnless7bit(gt);
+						setSeq(smfTrack, timestamp, [0xd0 | chNo, gt]);
+					}
+					break;
+				case EVENT.AFTER_K:
+					if (chNo >= 0) {
+						throwUnless7bit(gt, vel);
+						setSeq(smfTrack, timestamp, [0xa0 | chNo, gt, vel]);
+					}
 					break;
 
-				// MIDI messages
-				case EVENT.BankPrgL:
+				case EVENT.PROGRAM:
+					if (chNo >= 0) {
+						throwUnless7bit(gt);
+						setSeq(smfTrack, timestamp, [0xc0 | chNo, gt]);
+					}
+					break;
+
+					case EVENT.BankPrgL:
 				case EVENT.BankPrg:
 					// Note: According to the MIDI spec, Bank Select must be transmitted as a pair of MSB and LSB.
 					// But, a BankPrg event is converted to a single MSB or LSB at the current implementation.
@@ -1007,7 +1018,6 @@ export function convertRcmToSeq(rcm) {
 						setSeq(smfTrack, timestamp, [0xc0 | chNo, gt]);
 					}
 					break;
-
 				case EVENT.UserPrg:
 					if (chNo >= 0) {
 						if (gt < 0 || 192 <= gt) {
@@ -1028,35 +1038,25 @@ export function convertRcmToSeq(rcm) {
 					}
 					break;
 
-				case EVENT.AFTER_C:
-					if (chNo >= 0) {
-						throwUnless7bit(gt);
-						setSeq(smfTrack, timestamp, [0xd0 | chNo, gt]);
+				// SysEx
+				case EVENT.UsrExc0:
+				case EVENT.UsrExc1:
+				case EVENT.UsrExc2:
+				case EVENT.UsrExc3:
+				case EVENT.UsrExc4:
+				case EVENT.UsrExc5:
+				case EVENT.UsrExc6:
+				case EVENT.UsrExc7:
+					throwUnless7bit(gt, vel);
+					{
+						const {bytes, memo} = rcm.header.userSysExs[cmd - 0x90];
+						setSeq(smfTrack, timestamp, makeText(0x01, rawTrim(memo)));
+						setSeq(smfTrack, timestamp, makeSysEx(bytes, chNo, gt, vel));
 					}
 					break;
-				case EVENT.CONTROL:
-					if (chNo >= 0) {
-						throwUnless7bit(gt, vel);
-						setSeq(smfTrack, timestamp, [0xb0 | chNo, gt, vel]);
-					}
-					break;
-				case EVENT.PROGRAM:
-					if (chNo >= 0) {
-						throwUnless7bit(gt);
-						setSeq(smfTrack, timestamp, [0xc0 | chNo, gt]);
-					}
-					break;
-				case EVENT.AFTER_K:
-					if (chNo >= 0) {
-						throwUnless7bit(gt, vel);
-						setSeq(smfTrack, timestamp, [0xa0 | chNo, gt, vel]);
-					}
-					break;
-				case EVENT.PITCH:
-					if (chNo >= 0) {
-						throwUnless7bit(gt, vel);
-						setSeq(smfTrack, timestamp, [0xe0 | chNo, gt, vel]);
-					}
+				case EVENT.TrExcl:
+					throwUnless7bit(gt, vel);
+					setSeq(smfTrack, timestamp, makeSysEx(event.slice(4), chNo, gt, vel));
 					break;
 
 				// 1-byte DT1 SysEx for Roland devices
@@ -1197,19 +1197,19 @@ export function convertRcmToSeq(rcm) {
 					break;
 
 				// RCM commands
-				case EVENT.SecondEvt:
-				case EVENT.LoopEnd:
-				case EVENT.LoopStart:
-				case EVENT.SameMeas:
-					console.assert(false, 'Such kind of events must be resolved in the previous phase', {event});
-					break;
-
 				case EVENT.MeasEnd:
 					st = 0;
 					break;
 				case EVENT.TrackEnd:
 					// Expands the current step time to wait for all of note-off.
 					st = Math.max(...noteGts, 0);
+					break;
+
+				case EVENT.SecondEvt:
+				case EVENT.LoopEnd:
+				case EVENT.LoopStart:
+				case EVENT.SameMeas:
+					console.assert(false, 'Such kind of events must be resolved in the previous phase', {event});
 					break;
 
 				// Special commands for particular devices
@@ -1276,6 +1276,9 @@ export function convertRcmToSeq(rcm) {
 				case EVENT.MKS_7:
 					throwUnless7bit(gt, vel);
 					setSeq(smfTrack, timestamp, [0xf0, 0x41, 0x32, 0x01, gt, vel, 0xf7]);
+					break;
+				case EVENT.CMU_800:
+					console.warn('CMU-800 is not supported.', {gt});
 					break;
 
 				default:
