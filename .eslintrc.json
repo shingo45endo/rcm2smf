@@ -19,6 +19,7 @@
 		"quotes": ["error", "single", {"avoidEscape": true, "allowTemplateLiterals": true}],
 		"semi": ["error", "always"],
 
+		"block-spacing": ["error", "never"],
 		"comma-dangle": ["error", "always-multiline"],
 		"key-spacing": ["error",
 			{
@@ -42,19 +43,7 @@
 		"no-mixed-spaces-and-tabs": ["error", "smart-tabs"],
 		"no-use-before-define": ["error", "nofunc"],
 		"no-unused-vars": ["error", {"argsIgnorePattern": "^_$"}],
-		"prefer-destructuring": ["error",
-			{
-				"VariableDeclarator": {
-					"array": false,
-					"object": true
-				},
-				"AssignmentExpression": {
-					"array": false,
-					"object": false
-				}
-			}
-		],
-		"quote-props": ["error", "as-needed"],
+		"quote-props": ["error", "consistent-as-needed"],
 		"space-before-function-paren": ["error", {
 			"anonymous": "never",
 			"named": "never",
@@ -103,6 +92,8 @@
 		"object-property-newline": "off",
 		"one-var": "off",
 		"padded-blocks": "off",
+		"prefer-destructuring": "off",
+		"prefer-named-capture-group": "off",
 		"sort-imports": "off",
 		"sort-keys": "off",
 		"sort-vars": "off",

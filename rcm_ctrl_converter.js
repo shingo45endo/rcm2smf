@@ -1,4 +1,4 @@
-export const [convertMTDToSysEx, convertCM6ToSysEx] = ['MTD', 'CM6'].map((kind) => {
+export const [convertMtdToSysEx, convertCm6ToSysEx] = ['MTD', 'CM6'].map((kind) => {
 	const pos = {
 		MTD: {
 			la: {
@@ -111,7 +111,7 @@ export const [convertMTDToSysEx, convertCM6ToSysEx] = ['MTD', 'CM6'].map((kind) 
 	};
 });
 
-export function convertGSDToSysEx(buf) {
+export function convertGsdToSysEx(buf) {
 	// Checks the file header.
 	if (!buf || !buf.length || buf.length < 0x0a71 ||
 	    !String.fromCharCode(...buf.slice(0x0000, 0x000d)).startsWith('COME ON MUSIC') ||
@@ -264,7 +264,7 @@ function checkSum(bytes) {
 }
 
 const initialValues = {
-	// MT-32, CM-64
+	// MT-32/CM-64
 	0x16: {
 		// [LA SOUND PART]
 		0x03: [
@@ -717,6 +717,7 @@ const initialValues = {
 		0x49: [],
 	},
 };
+Object.freeze(initialValues);
 
 export function isSysExRedundant(bytes) {
 	// Checks the argument.
