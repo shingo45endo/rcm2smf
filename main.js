@@ -3,18 +3,172 @@ import path from 'path';
 import util from 'util';
 import assert from 'assert';
 
+import yargs from 'yargs';
 import iconv from 'iconv-lite';
-import {rcm2smf} from './rcm2smf.js';
+import {rcm2smf, defaultSettings} from './rcm_converter.js';
 
-console.assert = assert;
+// Options for yargs.
+const options = {
+	// Common
+	'debug': {
+		type: 'boolean',
+		default: false,
+		describe: 'Debug mode (Enable assertion)',
+	},
+
+	// About SMF generation
+	'meta-text-memo': {
+		describe: 'Generate SMF Text events for RCM memo area',
+	},
+	'meta-text-comment': {
+		describe: 'Generate SMF Text events for RCM Comment events',
+	},
+	'meta-text-usr-exc': {
+		describe: 'Generate SMF Text events for each RCM UsrExc events',
+	},
+	'meta-cue': {
+		describe: 'Generate SMF Cue Point events for RCM KeyScan and External Command event',
+	},
+	'trim-track-name': {
+		describe: 'Remove whitespace from SMF Sequence/Track Name events',
+		choices: ['none', 'left', 'right', 'both'],
+	},
+	'trim-text-memo': {
+		describe: 'Remove whitespace from SMF Text events for RCM memo area',
+		choices: ['none', 'left', 'right', 'both'],
+	},
+	'trim-text-comment': {
+		describe: 'Remove whitespace from SMF Text events for RCM Comment events',
+		choices: ['none', 'left', 'right', 'both'],
+	},
+	'trim-text-usr-exc': {
+		describe: 'Remove whitespace from SMF Text events for RCM UsrExc events',
+		choices: ['none', 'left', 'right', 'both'],
+	},
+	'note-off': {
+		describe: 'Use note-off ("8nH kk uu") events instead of "9nH kk 00H"',
+	},
+	'note-off-vel': {
+		describe: 'Velocity of note-off ("8nH kk uu") events',
+	},
+
+	// About RCM parsing
+	'st-plus': {
+		describe: 'Assume ST+ as signed (>= RCM 2.5) or unsigned (<= RCM 2.3a)',
+		choices: ['auto', 'signed', 'unsigned'],
+	},
+	'ignore-ctrl-file': {
+		describe: 'Ignore control files',
+	},
+	'ignore-out-of-range': {
+		describe: 'Ignore out-of-range values in events',
+	},
+	'ignore-wrong-event': {
+		describe: 'Ignore unexpected events',
+	},
+	'max-loop-nest': {
+		describe: 'Maximum loop nest level',
+	},
+	'infinity-loop-count': {
+		describe: 'Loop count to revise to avoid loop-bomb',
+	},
+	'loop-bomb-threshold': {
+		describe: 'Number of extracted beats considered as loop-bomb',
+	},
+	'roland-dev-id': {
+		describe: 'Initial value of device ID for RolDev#',
+	},
+	'roland-model-id': {
+		describe: 'Initial value of model ID for RolDev#',
+	},
+	'yamaha-dev-id': {
+		describe: 'Initial value of device ID for YamDev#',
+	},
+	'yamaha-model-id': {
+		describe: 'Initial value of model ID for YamDev#',
+	},
+};
+
+// Adds type and default value from the default settings defined in rcm_converter.
+for (const key of Object.keys(defaultSettings)) {
+	const optName = key.replace(/([A-Z])/ug, (s) => `-${s.charAt(0).toLowerCase()}`);
+	console.assert(optName in options);
+	Object.assign(options[optName], {
+		type: typeof defaultSettings[key],
+		default: defaultSettings[key],
+	});
+}
+
+// Parses argv by yargs.
+const argv = yargs.
+	strict().
+	options(options).
+	config(defaultSettings).
+	config('settings').
+	check((argv) => {
+		// Checks whether the specified numbers are valid.
+		for (const key of Object.keys(argv).filter((e) => typeof argv[e] === 'number')) {
+			if (Number.isNaN(argv[key]) || !Number.isInteger(argv[key])) {
+				throw new Error(`${key} must be a positive integer number.`);
+			}
+		}
+		// Checks whether the specified numbers are in range.
+		const ranges = {
+			noteOffVel:        [0, 127],
+			maxLoopNest:       [0, 100],
+			infinityLoopCount: [1, 255],
+			loopBombThreshold: [100, Infinity],
+			rolandDevId:       [0, 127],
+			rolandModelId:     [0, 127],
+			yamahaDevId:       [0, 127],
+			yamahaModelId:     [0, 127],
+		};
+		for (const key of Object.keys(ranges)) {
+			const [min, max] = ranges[key];
+			if (argv[key] < min || max < argv[key]) {
+				throw new Error(`${key} must be in a range of (${min} - ${max}).`);
+			}
+		}
+		return true;
+	}).
+	help().
+	alias('h', 'help').
+	alias('v', 'version').
+	group(['meta-text-memo', 'meta-text-comment', 'meta-text-usr-exc', 'meta-cue', 'trim-track-name', 'trim-text-memo', 'trim-text-comment', 'trim-text-usr-exc', 'note-off', 'note-off-vel'], 'SMF Generation:').
+	group(['st-plus', 'ignore-ctrl-file', 'ignore-out-of-range', 'ignore-wrong-event', 'max-loop-nest', 'infinity-loop-count', 'loop-bomb-threshold', 'roland-dev-id', 'roland-model-id', 'yamaha-dev-id', 'yamaha-model-id'], 'RCM Parsing:').
+	demandCommand(1).
+	usage('$0 [options] rcm-file [smf-file]').
+	wrap(yargs.terminalWidth() - 2).
+	argv;
+
+// Gets the file names from argv.
+const rcmFile = argv._[0];
+let   smfFile = argv._[1];
+if (!smfFile) {
+	// If the destination file name is not specify, makes it from the source file name.
+	const p = path.parse(rcmFile);
+	p.name = p.base;
+	p.base = '';
+	p.ext = '.mid';
+	smfFile = path.format(p);
+}
+
+// Extracts properties which have camel-case name as a settings.
+const settings = Object.keys(argv).filter((e) => /^[a-zA-Z0-9]+$/u.test(e)).reduce((p, c) => {
+	p[c] = argv[c];
+	return p;
+}, {});
+
+console.assert = (argv.debug) ? assert : () => {/* EMPTY */};
 
 const readFileAsync  = util.promisify(fs.readFile);
 const writeFileAsync = util.promisify(fs.writeFile);
 
+// Makes a file reader for control files.
 const fileReader = (fileName, fileNameRaw) => {
 	console.assert(fileName, 'Invalid argument');
 
-	const baseDir = path.parse(process.argv[2]).dir;
+	const baseDir = path.parse(rcmFile).dir;
 	if (/^[\x20-\x7E]*$/u.test(fileName)) {
 		return readFileAsync(path.join(baseDir, fileName));
 
@@ -27,12 +181,13 @@ const fileReader = (fileName, fileNameRaw) => {
 	}
 };
 
+// Converts an RCM file to a Standard MIDI File.
 (async () => {
 	try {
-		const rcmData = await readFileAsync(process.argv[2]);
-		const smfData = await rcm2smf(new Uint8Array(rcmData), fileReader);
-		await writeFileAsync(`${process.argv[2]}.mid`, smfData);
+		const rcmData = await readFileAsync(rcmFile);
+		const smfData = await rcm2smf(new Uint8Array(rcmData), fileReader, settings);
+		await writeFileAsync(smfFile, smfData);
 	} catch (e) {
-		console.error(e);
+		console.error((settings.debug) ? e : `${e}`);
 	}
 })();
