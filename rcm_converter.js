@@ -175,57 +175,60 @@ export async function parseRcm(buf, controlFileReader, options) {
 		if (settings.ignoreCtrlFile) {
 			break;
 		}
+
+		const keyName  = `fileName${kind}`;
+		const keyData  = `fileData${kind}`;
+		const keySysEx = `sysExs${kind}`;
+
+		if (!rcm.header[keyName] || rcm.header[keyName].length === 0) {
+			continue;
+		}
+
+		// Checks whether the control file reader is provided.
 		if (!controlFileReader) {
 			throw new Error('Control file reader is not specified');
 		}
 
-		const name  = `fileName${kind}`;
-		const data  = `fileData${kind}`;
-		const sysEx = `sysExs${kind}`;
+		// Reads the control file.
+		const fileName = String.fromCharCode(...rcm.header[keyName]);
+		const buf = await controlFileReader(fileName, (/^[\x20-\x7E]*$/u.test(fileName)) ? undefined : rcm.header[keyName]).catch((e) => {
+			throw new Error(`Control file not found: ${fileName}${(settings.debug) ? `\n${e}` : ''}`);
+		});
 
-		if (rcm.header[name] && rcm.header[name].length > 0) {
-			// Reads the control file.
-			const fileName = String.fromCharCode(...rcm.header[name]);
-			const buf = await controlFileReader(fileName, (/^[\x20-\x7E]*$/u.test(fileName)) ? undefined : rcm.header[name]).catch((e) => {
-				throw new Error(`Control file not found: ${fileName}${(settings.debug) ? `\n${e}` : ''}`);
-			});
+		// Parses the control file.
+		console.assert(buf);
+		const sysExs = {
+			MTD:  convertMtdToSysEx,
+			CM6:  convertCm6ToSysEx,
+			GSD:  convertGsdToSysEx,
+			GSD2: convertGsdToSysEx,
+		}[kind](buf);
+		if (!sysExs) {
+			throw new Error(`Not ${kind.slice(0, 3)} file: ${fileName}`);
+		}
 
-			// Parses the control file.
-			if (buf) {
-				const sysExs = {
-					MTD:  convertMtdToSysEx,
-					CM6:  convertCm6ToSysEx,
-					GSD:  convertGsdToSysEx,
-					GSD2: convertGsdToSysEx,
-				}[kind](buf);
-				if (!sysExs) {
-					throw new Error(`Not ${kind.slice(0, 3)} file: ${fileName}`);
+		rcm.header[keyData]  = buf;
+		rcm.header[keySysEx] = sysExs;
+
+		// Gets Patch Memory information for user patches.
+		if (kind === 'MTD') {
+			const patches = sysExs.filter((e) => {
+				// Extracts SysExs regarding Patch Memory. (#1-#128)
+				console.assert(e[0] === 0xf0 && e[1] === 0x41 && e[2] === 0x10 && e[3] === 0x16 && e[4] === 0x12);
+				return (e[5] === 0x05);	// Address '05 xx xx' is for Patch Memory
+			}).reduce((p, c) => {
+				// Splits payloads of SysExs by 8-byte.
+				console.assert(c.length > 5 + 3 + 2);
+				for (let i = 5 + 3; i < c.length; i += 8) {
+					const e = c.slice(i, i + 8);
+					if (e.length === 8) {
+						p.push(e);
+					}
 				}
-
-				rcm.header[data]  = buf;
-				rcm.header[sysEx] = sysExs;
-
-				// Gets Patch Memory information for user patches.
-				if (kind === 'MTD') {
-					const patches = sysExs.filter((e) => {
-						// Extracts SysExs regarding Patch Memory. (#1-#128)
-						console.assert(e[0] === 0xf0 && e[1] === 0x41 && e[2] === 0x10 && e[3] === 0x16 && e[4] === 0x12);
-						return (e[5] === 0x05);	// Address '05 xx xx' is for Patch Memory
-					}).reduce((p, c) => {
-						// Splits payloads of SysExs by 8-byte.
-						console.assert(c.length > 5 + 3 + 2);
-						for (let i = 5 + 3; i < c.length; i += 8) {
-							const e = c.slice(i, i + 8);
-							if (e.length === 8) {
-								p.push(e);
-							}
-						}
-						return p;
-					}, []);
-					console.assert(patches.length === 192);
-					rcm.header.patches = patches;
-				}
-			}
+				return p;
+			}, []);
+			console.assert(patches.length === 192);
+			rcm.header.patches = patches;
 		}
 	}
 
