@@ -131,14 +131,14 @@ const argv = yargs.
 		}
 		return true;
 	}).
+	demandCommand(1, "Argument 'rcm-file' is not specified.").
 	help().
 	alias('h', 'help').
 	alias('v', 'version').
 	group(['meta-text-memo', 'meta-text-comment', 'meta-text-usr-exc', 'meta-cue', 'trim-track-name', 'trim-text-memo', 'trim-text-comment', 'trim-text-usr-exc', 'note-off', 'note-off-vel'], 'SMF Generation:').
 	group(['st-plus', 'ignore-ctrl-file', 'ignore-out-of-range', 'ignore-wrong-event', 'max-loop-nest', 'infinity-loop-count', 'loop-bomb-threshold', 'roland-dev-id', 'roland-model-id', 'yamaha-dev-id', 'yamaha-model-id'], 'RCM Parsing:').
-	demandCommand(1).
 	usage('$0 [options] rcm-file [smf-file]').
-	wrap(yargs.terminalWidth() - 2).
+	wrap(Math.max(yargs.terminalWidth() - 2, 80)).
 	argv;
 
 // Gets the file names from argv.
