@@ -14,6 +14,8 @@ export const defaultSettings = {
 	noteOffVel: 64,
 
 	stPlus: 'auto',
+	resetBeforeCtrl:  true,
+	optimizeCtrl:     true,
 	ignoreCtrlFile:   false,
 	ignoreOutOfRange: true,
 	ignoreWrongEvent: true,
@@ -966,7 +968,9 @@ export function convertRcmToSeq(rcm, options) {
 		// Adds SysEx for GS.
 		if (rcm.header.sysExsGSD || rcm.header.sysExsGSD2) {
 			// Inserts GS reset SysEx.
-			allSysExs.push([0xf0, 0x41, 0x10, 0x42, 0x12, 0x40, 0x00, 0x7f, 0x00, 0x41, 0xf7]);
+			if (settings.resetBeforeCtrl) {
+				allSysExs.push([0xf0, 0x41, 0x10, 0x42, 0x12, 0x40, 0x00, 0x7f, 0x00, 0x41, 0xf7]);
+			}
 		}
 		if (rcm.header.sysExsGSD) {
 			// Adds SysEx from GSD file.
@@ -981,7 +985,9 @@ export function convertRcmToSeq(rcm, options) {
 		// Adds SysEx for MT-32/CM-64.
 		if (rcm.header.sysExsMTD || rcm.header.sysExsCM6) {
 			// Inserts a reset SysEx.
-			allSysExs.push([0xf0, 0x41, 0x10, 0x16, 0x12, 0x7f, 0x00, 0x00, 0x00, 0x01, 0xf7]);
+			if (settings.resetBeforeCtrl) {
+				allSysExs.push([0xf0, 0x41, 0x10, 0x16, 0x12, 0x7f, 0x00, 0x00, 0x00, 0x01, 0xf7]);
+			}
 		}
 		if (rcm.header.sysExsMTD) {
 			// Removes redundant SysEx. (For User Patch)
@@ -1002,7 +1008,7 @@ export function convertRcmToSeq(rcm, options) {
 		}
 
 		// Removes unnecessary SysEx.
-		const sysExs = allSysExs.filter((e) => !isSysExRedundant(e));
+		const sysExs = (settings.optimizeCtrl) ? allSysExs.filter((e) => !isSysExRedundant(e)) : allSysExs;
 
 		// Decides each interval between SysExs.
 		const extraTick = calcSetupMeasureTick(smfBeat.n, smfBeat.d, seq.timeBase, sysExs.length);

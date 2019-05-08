@@ -57,6 +57,12 @@ const options = {
 		describe: 'Assume ST+ as signed (>= RCM 2.5) or unsigned (<= RCM 2.3a)',
 		choices: ['auto', 'signed', 'unsigned'],
 	},
+	'reset-before-ctrl': {
+		describe: 'Send reset SysEx before sending control files',
+	},
+	'optimize-ctrl': {
+		describe: 'Optimize redundant SysEx generated from control files',
+	},
 	'ignore-ctrl-file': {
 		describe: 'Ignore control files',
 	},
@@ -112,6 +118,7 @@ const argv = yargs.
 				throw new Error(`${key} must be a positive integer number.`);
 			}
 		}
+
 		// Checks whether the specified numbers are in range.
 		const ranges = {
 			noteOffVel:        [0, 127],
@@ -129,6 +136,12 @@ const argv = yargs.
 				throw new Error(`${key} must be in a range of (${min} - ${max}).`);
 			}
 		}
+
+		// Initial reset SysEx cannot be omitted when optimizing SysEx generated from control files.
+		if (argv.optimizeCtrl && !argv.resetBeforeCtrl) {
+			throw new Error(`In case of optimizing SysEx for control files, adding an initial reset SysEx is needed.\n(Use "--reset-before-ctrl" or "--no-optimize-ctrl")`);
+		}
+
 		return true;
 	}).
 	demandCommand(1, "Argument 'rcm-file' is not specified.").
@@ -136,7 +149,7 @@ const argv = yargs.
 	alias('h', 'help').
 	alias('v', 'version').
 	group(['meta-text-memo', 'meta-text-comment', 'meta-text-usr-exc', 'meta-cue', 'trim-track-name', 'trim-text-memo', 'trim-text-comment', 'trim-text-usr-exc', 'note-off', 'note-off-vel'], 'SMF Generation:').
-	group(['st-plus', 'ignore-ctrl-file', 'ignore-out-of-range', 'ignore-wrong-event', 'max-loop-nest', 'infinity-loop-count', 'loop-bomb-threshold', 'roland-dev-id', 'roland-model-id', 'yamaha-dev-id', 'yamaha-model-id'], 'RCM Parsing:').
+	group(['st-plus', 'reset-before-ctrl', 'optimize-ctrl', 'ignore-ctrl-file', 'ignore-out-of-range', 'ignore-wrong-event', 'max-loop-nest', 'infinity-loop-count', 'loop-bomb-threshold', 'roland-dev-id', 'roland-model-id', 'yamaha-dev-id', 'yamaha-model-id'], 'RCM Parsing:').
 	usage('$0 [options] rcm-file [smf-file]').
 	wrap(Math.max(yargs.terminalWidth() - 2, 80)).
 	argv;
