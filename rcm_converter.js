@@ -1016,9 +1016,7 @@ export function convertRcmToSeq(rcm, options) {
 		const maxUsecPerBeat = Math.max(...timings.map((e) => e.usecPerBeat));
 
 		// Sets tempo slow during sending SysExs if necessary.
-		if (maxUsecPerBeat > usecPerBeat) {
-			setEvent(conductorTrack, 0, makeMetaTempo(maxUsecPerBeat));
-		}
+		setEvent(conductorTrack, 0, makeMetaTempo((maxUsecPerBeat > usecPerBeat) ? maxUsecPerBeat : usecPerBeat));
 
 		// Inserts SysExs from control files
 		let timestamp = startTime;
