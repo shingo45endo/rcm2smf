@@ -4,6 +4,9 @@
 		"es6": true,
 		"node": true
 	},
+	"plugins": [
+		"html"
+	],
 	"extends": "eslint:all",
 	"globals": {
 		"Atomics": "readonly",
@@ -55,6 +58,7 @@
 
 		"array-element-newline": "off",
 		"complexity": "off",
+		"func-names": "off",
 		"func-style": "off",
 		"id-length": "off",
 		"init-declarations": "off",
