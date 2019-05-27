@@ -624,8 +624,7 @@ document.addEventListener('DOMContentLoaded', () => {
 			break;
 		}
 
-		// Moves to the new pane.
-		$(`#${tabId}`).tab('show');
+		// Chooses the first track.
 		$(`#${paneId} .my-trackTabs a.nav-link:first`).tab('show');
 	}
 
@@ -842,9 +841,15 @@ document.addEventListener('DOMContentLoaded', () => {
 		e.stopPropagation();
 		e.preventDefault();
 
-		for (const file of [...e.dataTransfer.files]) {
-			addContent(file);
-		}
+		(async () => {
+			// Processes each file.
+			for (const file of [...e.dataTransfer.files]) {
+				await addContent(file);
+			}
+
+			// Moves to the newest pane.
+			$('#my-fileTabs a.nav-link:last').tab('show');
+		})();
 	});
 
 	// Adds "Help" pane.
