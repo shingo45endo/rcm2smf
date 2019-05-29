@@ -13,7 +13,6 @@
 /* eslint-disable strict, prefer-arrow-callback */
 'use strict';
 $(function() {
-
 	// Checks whether the browser supports necessary functionalities.
 	if (!(window.Promise) ||
 	    !(window.Map && window.Set) ||
@@ -487,8 +486,8 @@ const makeEventLists = (() => {
 	})[kind](events);
 })();
 
-document.addEventListener('DOMContentLoaded', () => {
-	/* global $, marked */
+/* global $, marked */
+$(() => {
 	/* eslint-disable no-invalid-this */
 
 	// Replaces the default console functions.
@@ -608,16 +607,10 @@ document.addEventListener('DOMContentLoaded', () => {
 		// Creates a page and appends it to the pane.
 		switch (content.kind) {
 		case 'rcm':
-			{
-				const $rcmPage = $(makeRcmPage(content.rcm, id, name));
-				$(`#${paneId}`).append($rcmPage);
-			}
+			$(`#${paneId}`).append(makeRcmPage(content.rcm, id, name));
 			break;
 		case 'ctrl':
-			{
-				const $ctrlPage = $(makeCtrlPage(content.sysExs));
-				$(`#${paneId}`).append($ctrlPage);
-			}
+			$(`#${paneId}`).append(makeCtrlPage(content.sysExs));
 			break;
 		default:
 			console.assert(false);
