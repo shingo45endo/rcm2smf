@@ -942,7 +942,7 @@ export function convertRcmToSeq(rcm, options) {
 	}
 	const usecPerBeat = 60 * 1000 * 1000 / rcm.header.tempo;
 
-	// Adds meta events to the conductor track.
+	// Adds a conductor track.
 	const conductorTrack = new Map();
 	seq.tracks.push(conductorTrack);
 
@@ -1010,27 +1010,38 @@ export function convertRcmToSeq(rcm, options) {
 		// Removes unnecessary SysEx.
 		const sysExs = (settings.optimizeCtrl) ? allSysExs.filter((e) => !isSysExRedundant(e)) : allSysExs;
 
-		// Decides each interval between SysExs.
-		const extraTick = calcSetupMeasureTick(smfBeat.n, smfBeat.d, seq.timeBase, sysExs.length);
-		const timings = spaceEachSysEx(sysExs, extraTick, seq.timeBase);
-		const maxUsecPerBeat = Math.max(...timings.map((e) => e.usecPerBeat));
+		if (sysExs.length > 0) {
+			// Decides each interval between SysExs.
+			const extraTick = calcSetupMeasureTick(smfBeat.n, smfBeat.d, seq.timeBase, sysExs.length);
+			const timings = spaceEachSysEx(sysExs, extraTick, seq.timeBase);
+			const maxUsecPerBeat = Math.max(...timings.map((e) => e.usecPerBeat));
 
-		// Sets tempo slow during sending SysExs if necessary.
-		setEvent(conductorTrack, 0, makeMetaTempo((maxUsecPerBeat > usecPerBeat) ? maxUsecPerBeat : usecPerBeat));
+			// Sets tempo slow during sending SysExs if necessary.
+			setEvent(conductorTrack, 0, makeMetaTempo((maxUsecPerBeat > usecPerBeat) ? maxUsecPerBeat : usecPerBeat));
 
-		// Inserts SysExs from control files
-		let timestamp = startTime;
-		for (const timing of timings) {
-			setEvent(conductorTrack, timestamp, timing.sysEx);
-			timestamp += timing.tick;
+			// Adds a new track for SysEx.
+			const track = new Map();
+			seq.tracks.push(track);
+			setMetaTrackName(track, 0, new Uint8Array([...'SysEx from control file'.split('').map((e) => e.charCodeAt(0))]));
+
+			// Inserts SysExs from control files
+			let timestamp = startTime;
+			for (const timing of timings) {
+				setEvent(track, timestamp, timing.sysEx);
+				timestamp += timing.tick;
+			}
+
+			// Sets original tempo.
+			if (maxUsecPerBeat > usecPerBeat) {
+				setEvent(conductorTrack, timestamp, makeMetaTempo(usecPerBeat));
+			}
+
+			startTime += extraTick;
+
+		} else {
+			// Set Tempo
+			setEvent(conductorTrack, 0, makeMetaTempo(usecPerBeat));
 		}
-
-		// Sets original tempo.
-		if (maxUsecPerBeat > usecPerBeat) {
-			setEvent(conductorTrack, timestamp, makeMetaTempo(usecPerBeat));
-		}
-
-		startTime += extraTick;
 
 	} else {
 		// Set Tempo
