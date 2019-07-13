@@ -26,6 +26,7 @@ export const defaultSettings = {
 	rolandModelId:  0x16,
 	yamahaDevId:    0x10,
 	yamahaModelId:  0x16,
+	basicCh: 0,
 };
 Object.freeze(defaultSettings);
 
@@ -1353,82 +1354,82 @@ export function convertRcmToSeq(rcm, options) {
 				// Special commands for particular devices
 				case EVENT.DX7FUNC:
 					if (validateRange(isIn7bitRange(gt, vel), `Invalid DX7FUNC event: [${hexStr(event)}]`)) {
-						setEvent(smfTrack, timestamp, [0xf0, 0x43, 0x11, 0x08, gt, vel, 0xf7]);
+						setEvent(smfTrack, timestamp, [0xf0, 0x43, 0x10 | settings.basicCh, 0x08, gt, vel, 0xf7]);
 					}
 					break;
 				case EVENT.DX_PARA:
 					if (validateRange(isIn7bitRange(gt, vel), `Invalid DX.PARA event: [${hexStr(event)}]`)) {
-						setEvent(smfTrack, timestamp, [0xf0, 0x43, 0x11, 0x00, gt, vel, 0xf7]);
+						setEvent(smfTrack, timestamp, [0xf0, 0x43, 0x10 | settings.basicCh, 0x00, gt, vel, 0xf7]);
 					}
 					break;
 				case EVENT.DX_PERF:
 					if (validateRange(isIn7bitRange(gt, vel), `Invalid DX.PERF event: [${hexStr(event)}]`)) {
-						setEvent(smfTrack, timestamp, [0xf0, 0x43, 0x11, 0x04, gt, vel, 0xf7]);
+						setEvent(smfTrack, timestamp, [0xf0, 0x43, 0x10 | settings.basicCh, 0x04, gt, vel, 0xf7]);
 					}
 					break;
 				case EVENT.TX_FUNC:
 					if (validateRange(isIn7bitRange(gt, vel), `Invalid TX.FUNC event: [${hexStr(event)}]`)) {
-						setEvent(smfTrack, timestamp, [0xf0, 0x43, 0x11, 0x11, gt, vel, 0xf7]);
+						setEvent(smfTrack, timestamp, [0xf0, 0x43, 0x10 | settings.basicCh, 0x11, gt, vel, 0xf7]);
 					}
 					break;
 				case EVENT.FB_01_P:
 					if (validateRange(isIn7bitRange(gt, vel), `Invalid FB-01 P event: [${hexStr(event)}]`)) {
-						setEvent(smfTrack, timestamp, [0xf0, 0x43, 0x11, 0x15, gt, vel, 0xf7]);
+						setEvent(smfTrack, timestamp, [0xf0, 0x43, 0x10 | settings.basicCh, 0x15, gt, vel, 0xf7]);
 					}
 					break;
 				case EVENT.FB_01_S:
 					if (validateRange(isIn7bitRange(gt, vel), `Invalid FB-01 S event: [${hexStr(event)}]`)) {
-						setEvent(smfTrack, timestamp, [0xf0, 0x43, 0x75, 0x01, 0x10, gt, vel, 0xf7]);
+						setEvent(smfTrack, timestamp, [0xf0, 0x43, 0x75, settings.basicCh, 0x10, gt, vel, 0xf7]);
 					}
 					break;
 				case EVENT.TX81Z_V:
 					if (validateRange(isIn7bitRange(gt, vel), `Invalid TX81Z V event: [${hexStr(event)}]`)) {
-						setEvent(smfTrack, timestamp, [0xf0, 0x43, 0x11, 0x12, gt, vel, 0xf7]);
+						setEvent(smfTrack, timestamp, [0xf0, 0x43, 0x10 | settings.basicCh, 0x12, gt, vel, 0xf7]);
 					}
 					break;
 				case EVENT.TX81Z_A:
 					if (validateRange(isIn7bitRange(gt, vel), `Invalid TX81Z A event: [${hexStr(event)}]`)) {
-						setEvent(smfTrack, timestamp, [0xf0, 0x43, 0x11, 0x13, gt, vel, 0xf7]);
+						setEvent(smfTrack, timestamp, [0xf0, 0x43, 0x10 | settings.basicCh, 0x13, gt, vel, 0xf7]);
 					}
 					break;
 				case EVENT.TX81Z_P:
 					if (validateRange(isIn7bitRange(gt, vel), `Invalid TX81Z P event: [${hexStr(event)}]`)) {
-						setEvent(smfTrack, timestamp, [0xf0, 0x43, 0x11, 0x10, gt, vel, 0xf7]);
+						setEvent(smfTrack, timestamp, [0xf0, 0x43, 0x10 | settings.basicCh, 0x10, gt, vel, 0xf7]);
 					}
 					break;
 				case EVENT.TX81Z_S:
 					if (validateRange(isIn7bitRange(gt, vel), `Invalid TX81Z S event: [${hexStr(event)}]`)) {
-						setEvent(smfTrack, timestamp, [0xf0, 0x43, 0x11, 0x10, 0x7b, gt, vel, 0xf7]);
+						setEvent(smfTrack, timestamp, [0xf0, 0x43, 0x10 | settings.basicCh, 0x10, 0x7b, gt, vel, 0xf7]);
 					}
 					break;
 				case EVENT.TX81Z_E:
 					if (validateRange(isIn7bitRange(gt, vel), `Invalid TX81Z E event: [${hexStr(event)}]`)) {
-						setEvent(smfTrack, timestamp, [0xf0, 0x43, 0x11, 0x10, 0x7c, gt, vel, 0xf7]);
+						setEvent(smfTrack, timestamp, [0xf0, 0x43, 0x10 | settings.basicCh, 0x10, 0x7c, gt, vel, 0xf7]);
 					}
 					break;
 				case EVENT.DX7_2_R:
 					if (validateRange(isIn7bitRange(gt, vel), `Invalid DX7-2 R event: [${hexStr(event)}]`)) {
-						setEvent(smfTrack, timestamp, [0xf0, 0x43, 0x11, 0x1b, gt, vel, 0xf7]);
+						setEvent(smfTrack, timestamp, [0xf0, 0x43, 0x10 | settings.basicCh, 0x1b, gt, vel, 0xf7]);
 					}
 					break;
 				case EVENT.DX7_2_A:
 					if (validateRange(isIn7bitRange(gt, vel), `Invalid DX7-2 A event: [${hexStr(event)}]`)) {
-						setEvent(smfTrack, timestamp, [0xf0, 0x43, 0x11, 0x18, gt, vel, 0xf7]);
+						setEvent(smfTrack, timestamp, [0xf0, 0x43, 0x10 | settings.basicCh, 0x18, gt, vel, 0xf7]);
 					}
 					break;
 				case EVENT.DX7_2_P:
 					if (validateRange(isIn7bitRange(gt, vel), `Invalid DX7-2 P event: [${hexStr(event)}]`)) {
-						setEvent(smfTrack, timestamp, [0xf0, 0x43, 0x11, 0x19, gt, vel, 0xf7]);
+						setEvent(smfTrack, timestamp, [0xf0, 0x43, 0x10 | settings.basicCh, 0x19, gt, vel, 0xf7]);
 					}
 					break;
 				case EVENT.TX802_P:
 					if (validateRange(isIn7bitRange(gt, vel), `Invalid TX802 P event: [${hexStr(event)}]`)) {
-						setEvent(smfTrack, timestamp, [0xf0, 0x43, 0x11, 0x1a, gt, vel, 0xf7]);
+						setEvent(smfTrack, timestamp, [0xf0, 0x43, 0x10 | settings.basicCh, 0x1a, gt, vel, 0xf7]);
 					}
 					break;
 				case EVENT.MKS_7:
 					if (validateRange(isIn7bitRange(gt, vel), `Invalid MKS-7 event: [${hexStr(event)}]`)) {
-						setEvent(smfTrack, timestamp, [0xf0, 0x41, 0x32, 0x01, gt, vel, 0xf7]);
+						setEvent(smfTrack, timestamp, [0xf0, 0x41, 0x32, settings.basicCh, gt, vel, 0xf7]);
 					}
 					break;
 				case EVENT.CMU_800:
