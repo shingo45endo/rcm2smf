@@ -24,7 +24,7 @@ $(function() {
 
 		// Adds how to use.
 		const text = (document.getElementById('my-markdown').content || $('#my-markdown')[0]).textContent;
-		$('#my-filePanes').append($(marked(text, {headerIds: false, sanitize: true})));
+		$('#my-filePanes').append($(marked(text, {headerIds: false})));
 	}
 });
 /* eslint-enable strict, prefer-arrow-callback */
@@ -849,7 +849,7 @@ $(() => {
 	$('#my-fileTabs').append($(`<li class="nav-item"><a id="my-tab-help" class="nav-link" href="#my-pane-help" role="tab" data-toggle="tab">Help</a></li>`));
 	$('#my-filePanes').append($(`<div id="my-pane-help" class="tab-pane fade" role="tabpanel"></div>`));
 	$('#my-pane-help').append($(makeElementFromTemplateId('my-help')));
-	$('#my-pane-help .my-helpText').append(marked(document.getElementById('my-markdown').content.textContent, {headerIds: false, sanitize: true}));
+	$('#my-pane-help .my-helpText').append(marked(document.getElementById('my-markdown').content.textContent, {headerIds: false}));
 	$(`#my-tab-help`).tab('show');
 
 	/* eslint-enable no-invalid-this */
