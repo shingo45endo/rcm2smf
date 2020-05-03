@@ -93,9 +93,6 @@ const options = {
 	'yamaha-model-id': {
 		describe: 'Initial value of model ID for YamDev#',
 	},
-	'basic-ch': {
-		describe: 'Basic channel No. for legacy special commands',
-	},
 };
 
 // Adds type and default value from the default settings defined in rcm_converter.
@@ -132,7 +129,6 @@ const argv = yargs.
 			rolandModelId:     [0, 127],
 			yamahaDevId:       [0, 127],
 			yamahaModelId:     [0, 127],
-			basicCh:           [0, 15],
 		};
 		for (const key of Object.keys(ranges)) {
 			const [min, max] = ranges[key];
