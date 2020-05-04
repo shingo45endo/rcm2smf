@@ -87,11 +87,23 @@ const options = {
 	'roland-model-id': {
 		describe: 'Initial value of model ID for RolDev#',
 	},
+	'roland-base-addr-h': {
+		describe: 'Initial value of Initial value of the base address (H) for RolBase',
+	},
+	'roland-base-addr-m': {
+		describe: 'Initial value of Initial value of the base address (M) for RolBase',
+	},
 	'yamaha-dev-id': {
 		describe: 'Initial value of device ID for YamDev#',
 	},
 	'yamaha-model-id': {
 		describe: 'Initial value of model ID for YamDev#',
+	},
+	'yamaha-base-addr-h': {
+		describe: 'Initial value of Initial value of the base address (H) for YamBase',
+	},
+	'yamaha-base-addr-m': {
+		describe: 'Initial value of Initial value of the base address (M) for YamBase',
 	},
 };
 
@@ -127,8 +139,12 @@ const argv = yargs.
 			loopBombThreshold: [100, Infinity],
 			rolandDevId:       [0, 127],
 			rolandModelId:     [0, 127],
+			rolandBaseAddrH:   [0, 127],
+			rolandBaseAddrM:   [0, 127],
 			yamahaDevId:       [0, 127],
 			yamahaModelId:     [0, 127],
+			yamahaBaseAddrH:   [0, 127],
+			yamahaBaseAddrM:   [0, 127],
 		};
 		for (const key of Object.keys(ranges)) {
 			const [min, max] = ranges[key];
@@ -148,8 +164,19 @@ const argv = yargs.
 	help().
 	alias('h', 'help').
 	alias('v', 'version').
-	group(['meta-text-memo', 'meta-text-comment', 'meta-text-usr-exc', 'meta-cue', 'trim-track-name', 'trim-text-memo', 'trim-text-comment', 'trim-text-usr-exc', 'note-off', 'note-off-vel'], 'SMF Generation:').
-	group(['st-plus', 'reset-before-ctrl', 'optimize-ctrl', 'ignore-ctrl-file', 'ignore-out-of-range', 'ignore-wrong-event', 'max-loop-nest', 'infinity-loop-count', 'loop-bomb-threshold', 'roland-dev-id', 'roland-model-id', 'yamaha-dev-id', 'yamaha-model-id'], 'RCM Parsing:').
+	group([
+		'meta-text-memo', 'meta-text-comment', 'meta-text-usr-exc', 'meta-cue',
+		'trim-track-name', 'trim-text-memo', 'trim-text-comment', 'trim-text-usr-exc',
+		'note-off', 'note-off-vel',
+	], 'SMF Generation:').
+	group([
+		'st-plus',
+		'reset-before-ctrl', 'optimize-ctrl', 'ignore-ctrl-file',
+		'ignore-out-of-range', 'ignore-wrong-event',
+		'max-loop-nest', 'infinity-loop-count', 'loop-bomb-threshold',
+		'roland-dev-id', 'roland-model-id', 'roland-base-addr-h', 'roland-base-addr-m',
+		'yamaha-dev-id', 'yamaha-model-id', 'yamaha-base-addr-h', 'yamaha-base-addr-m',
+	], 'RCM Parsing:').
 	usage('$0 [options] rcm-file [smf-file]').
 	wrap(Math.max(yargs.terminalWidth() - 2, 80)).
 	argv;
