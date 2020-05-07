@@ -161,6 +161,45 @@ export async function rcm2smf(buf, controlFileReader, options) {
 	return smf;
 }
 
+export function ctrl2smf(buf, title, options) {
+	// Checks the arguments.
+	if (!buf || !buf.length) {
+		throw new Error(`Invalid argument: ${buf}`);
+	}
+
+	// Makes a dummy (empty) rcm object.
+	const rcm = {
+		header: {
+			title: new Uint8Array(String(title).split('').map((e) => e.charCodeAt())),
+			timeBase: 48,
+			tempo: 120,
+			beatN: 4,
+			beatD: 4,
+			maxTracks: 0,
+		},
+		tracks: [],
+	};
+
+	// Converts from MCP/CM6/GSD to SysExs.
+	let sysExs = convertCm6ToSysEx(buf) || convertMtdToSysEx(buf);
+	if (sysExs) {
+		rcm.header.sysExsCM6 = sysExs;	// Handles MTD as CM6 to avoid particularities of MCP.
+	} else {
+		sysExs = convertGsdToSysEx(buf);
+		if (sysExs) {
+			rcm.header.sysExsGSD = sysExs;
+		} else {
+			throw new Error('Invalid control file');
+		}
+	}
+
+	// Converts from the generated rcm object to SMF.
+	const seq = convertRcmToSeq(rcm, options);
+	const smf = convertSeqToSmf(seq, rcm.header.timeBase, options);
+
+	return smf;
+}
+
 export async function parseRcm(buf, controlFileReader, options) {
 	// Checks the arguments.
 	if (!buf || !buf.length) {
@@ -962,7 +1001,9 @@ export function convertRcmToSeq(rcm, options) {
 	setEvent(conductorTrack, 0, [0xff, 0x58, 0x04, smfBeat.n, Math.log2(smfBeat.d), 0x18, 0x08]);
 
 	// Key Signature
-	setEvent(conductorTrack, 0, convertKeySignature(rcm.header.key));
+	if ('key' in rcm.header) {
+		setEvent(conductorTrack, 0, convertKeySignature(rcm.header.key));
+	}
 
 	// Adds a setup measure which consists of SysEx converted from control files.
 	if (rcm.header.sysExsMTD || rcm.header.sysExsCM6 || rcm.header.sysExsGSD || rcm.header.sysExsGSD2) {
