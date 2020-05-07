@@ -30,7 +30,7 @@ $(function() {
 /* eslint-enable strict, prefer-arrow-callback */
 </script>
 <script type="module">
-import {parseRcm, convertRcmToSeq, convertSeqToSmf, defaultSettings} from './rcm_converter.js';
+import {parseRcm, convertRcmToSeq, convertSeqToSmf, ctrl2smf, defaultSettings} from './rcm_converter.js';
 import {convertMtdToSysEx, convertCm6ToSysEx, convertGsdToSysEx, isSysExRedundant} from './rcm_ctrl_converter.js';
 
 function readFileAsync(file) {
@@ -610,7 +610,7 @@ $(() => {
 			$(`#${paneId}`).append(makeRcmPage(content.rcm, id, name));
 			break;
 		case 'ctrl':
-			$(`#${paneId}`).append(makeCtrlPage(content.sysExs));
+			$(`#${paneId}`).append(makeCtrlPage(content.sysExs, name));
 			break;
 		default:
 			console.assert(false);
@@ -670,11 +670,11 @@ $(() => {
 		$(`.my-title`, $rcmPage).text(decodeNec932(rcm.header.title));
 
 		// File name
-		const $smfFileName = $(`.my-smfFileName`, $rcmPage);
-		$smfFileName.val(`${name}.mid`);
+		const $rcmSmfFileName = $(`.my-rcmSmfFileName`, $rcmPage);
+		$rcmSmfFileName.val(`${name}.mid`);
 
 		// Convert
-		$(`.my-convert`, $rcmPage).on('click', ((rcmFileName, $smfFileName) => async function() {
+		$(`.my-convertRcm`, $rcmPage).on('click', ((rcmFileName, smfFileName) => async function() {
 			emptyLogs();
 			try {
 				const rcm = await parseRcm(contents[rcmFileName].buf, getContent, currentSettings);
@@ -682,14 +682,14 @@ $(() => {
 				const smf = convertSeqToSmf(seq, rcm.header.timeBase, currentSettings);
 				const blob = new Blob([smf], {type: 'audio/midi'});
 
-				$(this).attr('download', $smfFileName.val());
+				$(this).attr('download', smfFileName);
 				$(this).attr('href', URL.createObjectURL(blob));
 			} catch (e) {
 				console.error(e);
 			}
 
 			return false;
-		})(name, $smfFileName));
+		})(name, $rcmSmfFileName.val()));
 
 		// Header
 		['tempo', 'playBias', 'beatD', 'beatN', 'timeBase'].forEach((key) => {
@@ -767,7 +767,7 @@ $(() => {
 		return $rcmPage;
 	}
 
-	function makeCtrlPage(sysExs) {
+	function makeCtrlPage(sysExs, name) {
 		const tableAddr = [
 			[/^f0 41 10 16 12 03/u, 'Patch Temporary Area (LA)'],
 			[/^f0 41 10 16 12 04/u, 'Timbre Temporary Area (LA)'],
@@ -805,6 +805,47 @@ $(() => {
 
 		const $ctrlPage = $(makeElementFromTemplateId('my-ctrlFile'));
 
+		// File name
+		const $ctrlSyxFileName = $(`.my-ctrlSyxFileName`, $ctrlPage);
+		$ctrlSyxFileName.val(`${name}.syx`);
+
+		const $ctrlSmfFileName = $(`.my-ctrlSmfFileName`, $ctrlPage);
+		$ctrlSmfFileName.val(`${name}.mid`);
+
+		// Convert
+		$(`.my-convertCtrlSyx`, $ctrlPage).on('click', ((ctrlFileName, syxFileName) => function() {
+			emptyLogs();
+			try {
+				const bytesIn = contents[ctrlFileName].buf;
+				const sysExs = convertCm6ToSysEx(bytesIn) || convertMtdToSysEx(bytesIn) || convertGsdToSysEx(bytesIn);
+				const bytesOut = new Uint8Array([].concat(...sysExs));
+				const blob = new Blob([bytesOut], {type: 'application/octet-stream'});
+
+				$(this).attr('download', syxFileName);
+				$(this).attr('href', URL.createObjectURL(blob));
+			} catch (e) {
+				console.error(e);
+			}
+
+			return false;
+		})(name, $ctrlSyxFileName.val()));
+
+		$(`.my-convertCtrlSmf`, $ctrlPage).on('click', ((ctrlFileName, smfFileName) => function() {
+			emptyLogs();
+			try {
+				const smf = ctrl2smf(contents[ctrlFileName].buf, ctrlFileName, currentSettings);
+				const blob = new Blob([smf], {type: 'audio/midi'});
+
+				$(this).attr('download', smfFileName);
+				$(this).attr('href', URL.createObjectURL(blob));
+			} catch (e) {
+				console.error(e);
+			}
+
+			return false;
+		})(name, $ctrlSmfFileName.val()));
+
+		// SysExs
 		for (const sysEx of sysExs) {
 			const hexStr = [...sysEx].map((e) => e.toString(16).padStart(2, '0')).join(' ');
 			const addrStr = tableAddr.filter((e) => e[0].test(hexStr))[0][1];
@@ -1165,9 +1206,9 @@ th {
 					<div class="input-group-prepend">
 						<div class="input-group-text">SMF Name</div>
 					</div>
-					<input type="text" class="my-smfFileName form-control" placeholder="SMF File Name">
+					<input type="text" class="my-rcmSmfFileName form-control" placeholder="SMF File Name">
 					<div class="input-group-append">
-						<a class="my-convert btn btn-primary" href="#" role="button">Convert</a>
+						<a class="my-convertRcm btn btn-primary" href="#" role="button">Convert</a>
 					</div>
 				</div>
 			</div>
@@ -1299,6 +1340,33 @@ th {
 
 	<!-- Template for control file -->
 	<template id="my-ctrlFile">
+		<div class="row mt-2">
+			<div class="col-xl-4 col-lg-12">
+				<h2 class="my-title h6 mt-3 mb-lg-0">Control File</h2>
+			</div>
+			<div class="col-xl-4 col-lg-6 d-flex justify-content-end">
+				<div class="input-group mr-2">
+					<div class="input-group-prepend">
+						<div class="input-group-text">Syx Name</div>
+					</div>
+					<input type="text" class="my-ctrlSyxFileName form-control" placeholder="Syx File Name">
+					<div class="input-group-append">
+						<a class="my-convertCtrlSyx btn btn-primary" href="#" role="button">Convert</a>
+					</div>
+				</div>
+			</div>
+			<div class="col-xl-4 col-lg-6 d-flex justify-content-end">
+				<div class="input-group mr-2">
+					<div class="input-group-prepend">
+						<div class="input-group-text">SMF Name</div>
+					</div>
+					<input type="text" class="my-ctrlSmfFileName form-control" placeholder="SMF File Name">
+					<div class="input-group-append">
+						<a class="my-convertCtrlSmf btn btn-primary" href="#" role="button">Convert</a>
+					</div>
+				</div>
+			</div>
+		</div>
 		<div class="row mt-3">
 			<div class="col-12">
 				<div class="card">
@@ -1357,7 +1425,7 @@ Supported Formats
 * G36
 	* RECOMPOSER Ver.2.5G, Ver.3.0, and for Windows
 	* Time base can be 480 ticks per beat at a maximum.
-	* Contains at most 36 tracks.
+	* Contains at most 36 tracks (or 99 tracks only for Windows 95 Version)
 
 ### Control Files
 
