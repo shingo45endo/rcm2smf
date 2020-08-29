@@ -2,10 +2,14 @@
   "name": "rcm2smf",
   "version": "0.1.0",
   "description": "RECOMPOSER file (.RCP, .R36, .G36, and .MCP) to Standard MIDI File (.mid) converter",
-  "main": "index.js",
-  "module": "main.js",
+  "engines": {
+    "node": ">=12.17"
+  },
+  "type": "module",
+  "main": "rcm2smf.js",
+  "module": "rcm2smf.js",
   "bin": {
-    "rcm2smf": "index.js"
+    "rcm2smf": "rcm2smf.js"
   },
   "scripts": {
     "lint": "eslint *.js index.html"
@@ -21,7 +25,6 @@
   },
   "homepage": "https://github.com/shingo45endo/rcm2smf#readme",
   "dependencies": {
-    "esm": "^3.2.20",
     "iconv-lite": "^0.4.24",
     "yargs": "^13.2.2"
   },
