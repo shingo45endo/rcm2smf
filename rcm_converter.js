@@ -1069,7 +1069,7 @@ export function convertRcmToSeq(rcm, options) {
 			seq.tracks.push(track);
 			setMetaTrackName(track, 0, new Uint8Array([...'SysEx from control file'.split('').map((e) => e.charCodeAt(0))]));
 
-			// Inserts SysExs from control files
+			// Inserts SysExs from control files.
 			let timestamp = startTime;
 			for (const timing of timings) {
 				setEvent(track, timestamp, timing.sysEx);
@@ -1081,7 +1081,11 @@ export function convertRcmToSeq(rcm, options) {
 				setEvent(conductorTrack, timestamp, makeMetaTempo(usecPerBeat));
 			}
 
+			// Shifts the start time.
 			startTime += extraTick;
+
+			// Adds an End of Track event to the SysEx track.
+			setEvent(track, startTime, [0xff, 0x2f, 0x00]);
 
 		} else {
 			// Set Tempo
