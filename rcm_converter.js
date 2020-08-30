@@ -818,7 +818,7 @@ function extractRhythm(seqEvents, patternEvents, settings) {
 					if (c > 0) {
 						const event = [
 							//  BD, SD, LT, MT, HT, RS, HC, CH, OH, CC, RC
-							[0, 36, 38, 41, 45, 48, 37, 39, 42, 44, 49, 51][i],	// Note No.
+							[0, 36, 38, 41, 45, 48, 37, 39, 42, 46, 49, 51][i],	// Note No.
 							0,					// Step time
 							1,					// Gate time
 							velValues[c - 1],	// Velocity
