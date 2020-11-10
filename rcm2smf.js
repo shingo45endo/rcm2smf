@@ -29,6 +29,9 @@ const options = {
 	'meta-cue': {
 		describe: 'Generate SMF Cue Point events for RCM KeyScan and External Command event',
 	},
+	'meta-time-signature': {
+		describe: 'Generate SMF Time Signature events from each measure\'s step time',
+	},
 	'trim-track-name': {
 		describe: 'Remove whitespace from SMF Sequence/Track Name events',
 		choices: ['none', 'left', 'right', 'both'],
@@ -165,7 +168,7 @@ const argv = yargs.
 	alias('h', 'help').
 	alias('v', 'version').
 	group([
-		'meta-text-memo', 'meta-text-comment', 'meta-text-usr-exc', 'meta-cue',
+		'meta-text-memo', 'meta-text-comment', 'meta-text-usr-exc', 'meta-cue', 'meta-time-signature',
 		'trim-track-name', 'trim-text-memo', 'trim-text-comment', 'trim-text-usr-exc',
 		'note-off', 'note-off-vel',
 	], 'SMF Generation:').

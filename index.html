@@ -1010,6 +1010,16 @@ th {
 								</div>
 							</div>
 							<div class="form-group row">
+								<div class="offset-2 col-10">
+									<div class="form-check">
+										<input id="my-metaTimeSignature" type="checkbox" class="form-check-input">
+										<label for="my-metaTimeSignature" class="form-check-label">
+											Generate SMF Time Signature events from each measure's step time
+										</label>
+									</div>
+								</div>
+							</div>
+							<div class="form-group row">
 								<div class="col-2 float-left" style="height: 0;">Trimming</div>
 								<div class="col-8">Remove whitespace from SMF Sequence/Track Name event</div>
 								<select class="custom-select col-2" id="my-trimTrackName">
@@ -1155,7 +1165,7 @@ th {
 								<input id="my-rolandBaseAddrM" type="number" class="form-control col-2" min="0" max="127" placeholder="Address (M)">
 							</div>
 							<div class="form-group row">
-								<div class="col-2 float-left" style="height: 0;">YamPara</div>
+								<div class="col-2 float-left" style="height: 0;">XGPara &amp; YamPara</div>
 								<div class="col-8">Initial value of device ID for <code>YamDev#</code></div>
 								<input id="my-yamahaDevId" type="number" class="form-control col-2" min="0" max="127" placeholder="Device ID">
 							</div>

@@ -2,10 +2,11 @@ import {convertMtdToSysEx, convertCm6ToSysEx, convertGsdToSysEx, isSysExRedundan
 
 // Default settings of this converter.
 export const defaultSettings = {
-	metaTextMemo:    true,
-	metaTextComment: true,
-	metaTextUsrExc:  true,
-	metaCue:         true,
+	metaTextMemo:      true,
+	metaTextComment:   true,
+	metaTextUsrExc:    true,
+	metaCue:           true,
+	metaTimeSignature: true,
 	trimTrackName:   'both',
 	trimTextMemo:    'none',
 	trimTextComment: 'both',
@@ -943,6 +944,68 @@ function spaceEachSysEx(sysExs, maxTick, timeBase) {
 	}
 }
 
+function getMeasureSt(rcm) {
+	console.assert(rcm);
+	console.assert(EVENT_RCP.MeasEnd  === EVENT_MCP.MeasEnd);
+	console.assert(EVENT_RCP.TrackEnd === EVENT_MCP.TrackEnd);
+
+	// Extracts all events and calculates step time of every measure.
+	const allStMeasures = rcm.tracks.filter((track) => track.extractedEvents).map((track) => {
+		const stMeasures = [];
+		let st = 0;
+		for (const event of track.extractedEvents) {
+			if (event[0] < 0xf5) {
+				st += event[1];
+			} else if (event[0] === EVENT_RCP.MeasEnd || event[0] === EVENT_RCP.TrackEnd) {
+				if (st > 0) {
+					stMeasures.push(st);
+					st = 0;
+				}
+			}
+		}
+		return stMeasures;
+	});
+
+	// Chooses the most "common" step times of each measure from all the tracks.
+	const maxMeasureNo = Math.max(...allStMeasures.map((e) => e.length));
+	const wholeStMeasures = [];
+	let survivors = new Set([...new Array(allStMeasures.length)].map((_, i) => i));
+	for (let measureNo = 0; measureNo < maxMeasureNo; measureNo++) {
+		// Gets each track's step time in the current measure.
+		const map = new Map();
+		for (let trackNo = 0; trackNo < allStMeasures.length; trackNo++) {
+			if (!survivors.has(trackNo)) {
+				continue;
+			}
+			if (measureNo >= allStMeasures[trackNo].length) {
+				survivors.delete(trackNo);
+				continue;
+			}
+
+			const st = allStMeasures[trackNo][measureNo];
+			if (map.has(st)) {
+				console.assert(Array.isArray(map.get(st)));
+				map.get(st).push(trackNo);
+			} else {
+				map.set(st, [trackNo]);
+			}
+		}
+
+		if (survivors.size === 0) {
+			break;
+		}
+
+		// Chooses this measure's step time by "majority vote".
+		const entries = [...map.entries()];
+		const matchNum = Math.max(...entries.map(([_, trackNos]) => trackNos.length));
+		const [st, trackNos] = entries.find(([_, trackNos]) => trackNos.length === matchNum);
+		wholeStMeasures.push(st);
+		survivors = new Set(trackNos);
+	}
+
+	return wholeStMeasures;
+}
+
 export function convertRcmToSeq(rcm, options) {
 	// Checks the arguments.
 	if (!rcm) {
@@ -978,11 +1041,6 @@ export function convertRcmToSeq(rcm, options) {
 		timeBase: rcm.header.timeBase,
 		tracks: [],
 	};
-	const smfBeat = {n: 4, d: 4};
-	if (rcm.header.beatD !== 0 && (rcm.header.beatD & (rcm.header.beatD - 1) === 0)) {
-		smfBeat.d = rcm.header.beatD;
-		smfBeat.n = rcm.header.beatN;
-	}
 	const usecPerBeat = 60 * 1000 * 1000 / rcm.header.tempo;
 
 	// Adds a conductor track.
@@ -998,7 +1056,12 @@ export function convertRcmToSeq(rcm, options) {
 	}
 
 	// Time Signature
-	setEvent(conductorTrack, 0, [0xff, 0x58, 0x04, smfBeat.n, Math.log2(smfBeat.d), 0x18, 0x08]);
+	const initialBeat = {numer: 4, denom: 4};
+	if (rcm.header.beatD !== 0 && (rcm.header.beatD & (rcm.header.beatD - 1) === 0)) {
+		initialBeat.numer = rcm.header.beatN;
+		initialBeat.denom = rcm.header.beatD;
+	}
+	setEvent(conductorTrack, 0, makeMetaTimeSignature(initialBeat.numer, initialBeat.denom));
 
 	// Key Signature
 	if ('key' in rcm.header) {
@@ -1057,7 +1120,7 @@ export function convertRcmToSeq(rcm, options) {
 
 		if (sysExs.length > 0) {
 			// Decides each interval between SysExs.
-			const extraTick = calcSetupMeasureTick(smfBeat.n, smfBeat.d, seq.timeBase, sysExs.length);
+			const extraTick = calcSetupMeasureTick(initialBeat.numer, initialBeat.denom, seq.timeBase, sysExs.length);
 			const timings = spaceEachSysEx(sysExs, extraTick, seq.timeBase);
 			const maxUsecPerBeat = Math.max(...timings.map((e) => e.usecPerBeat));
 
@@ -1095,6 +1158,42 @@ export function convertRcmToSeq(rcm, options) {
 	} else {
 		// Set Tempo
 		setEvent(conductorTrack, 0, makeMetaTempo(usecPerBeat));
+	}
+
+	// Adds Time Signature meta events from each measure's step time.
+	if (settings.metaTimeSignature) {
+		const stMeasures = getMeasureSt(rcm);
+		const maxMeasureSt = Math.max(seq.timeBase * initialBeat.numer * 2 / initialBeat.denom, 192 * 2);
+		const maxDenom = 16;
+		const minBeatSt = seq.timeBase * 4 / maxDenom;
+		if (stMeasures.every((st) => st <= maxMeasureSt) && stMeasures.every((st) => st % minBeatSt === 0)) {
+			// Makes each measure's time signature.
+			const beats = stMeasures.map((st) => {
+				for (let denom = initialBeat.denom; denom <= maxDenom; denom *= 2) {
+					const beatSt = seq.timeBase * 4 / denom;
+					const numer = st / beatSt;
+					if (Number.isInteger(numer)) {
+						return {numer, denom};
+					}
+				}
+				console.assert(false);
+				return null;
+			});
+			const dedupedBeats = beats.map((e, i, a) => {
+				const p = (i > 0) ? a[i - 1] : initialBeat;
+				return (e.numer === p.numer && e.denom === p.denom) ? null : e;
+			});
+
+			// Adds Time Signature meta events.
+			let timestamp = 0;
+			console.assert(stMeasures.length === dedupedBeats.length);
+			for (let i = 0; i < stMeasures.length; i++) {
+				if (dedupedBeats[i]) {
+					setEvent(conductorTrack, startTime + timestamp, makeMetaTimeSignature(dedupedBeats[i].numer, dedupedBeats[i].denom));
+				}
+				timestamp += stMeasures[i];
+			}
+		}
 	}
 
 	// Converts each track.
@@ -1591,6 +1690,12 @@ export function convertRcmToSeq(rcm, options) {
 		const bytes = new Uint8Array(4);
 		(new DataView(bytes.buffer)).setUint32(0, Math.trunc(usecPerBeat));
 		return [0xff, 0x51, 0x03, ...bytes.slice(1)];
+	}
+
+	function makeMetaTimeSignature(numer, denom) {
+		console.assert(Number.isInteger(numer), 'Invalid argument', {numer});
+		console.assert(Number.isInteger(denom) && (denom & (denom - 1)) === 0, 'Invalid argument', {denom});
+		return [0xff, 0x58, 0x04, numer, Math.log2(denom), 0x18, 0x08];
 	}
 }
 
