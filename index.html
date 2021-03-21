@@ -827,7 +827,7 @@ $(() => {
 				console.error(e);
 			}
 
-			return false;
+			return true;
 		})(name, $ctrlSyxFileName.val()));
 
 		$(`.my-convertCtrlSmf`, $ctrlPage).on('click', ((ctrlFileName, smfFileName) => function() {
@@ -842,7 +842,7 @@ $(() => {
 				console.error(e);
 			}
 
-			return false;
+			return true;
 		})(name, $ctrlSmfFileName.val()));
 
 		// SysExs
