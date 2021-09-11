@@ -849,10 +849,25 @@ $(() => {
 		for (const sysEx of sysExs) {
 			const hexStr = [...sysEx].map((e) => e.toString(16).padStart(2, '0')).join(' ');
 			const addrStr = tableAddr.filter((e) => e[0].test(hexStr))[0][1];
+			let timbreHtml;
+			if (/^f0 41 10 16 12 08 [0-7][02468ace] 00/u.test(hexStr)) {
+				const timbreNo = sysEx[6] / 2;
+				console.assert(Number.isInteger(timbreNo) && (0 <= timbreNo && timbreNo < 64));
+				const timbreName = String.fromCharCode(...sysEx.slice(8, 18));
+				timbreHtml = `
+					<div class="card bg-light mt-2">
+						<div class="card-body py-1">
+							I${String(timbreNo).padStart(2, '0')}: <pre class="my-0">${timbreName}</pre>
+						</div>
+					</div>`;
+			}
 			const isRedundant = isSysExRedundant(sysEx);
 			$('.my-sysExs', $ctrlPage).append($(`
 				<tr class="${(isRedundant) ? 'table-secondary text-muted' : ''}">
-					<th style="width: 15rem;">${addrStr}</th>
+					<th style="width: 15rem;">
+						${addrStr}
+						${(timbreHtml) ? timbreHtml : ''}
+					</th>
 					<td>
 						<pre class="my-sysEx mb-0"><code>${hexStr}</code></pre>
 					</td>
