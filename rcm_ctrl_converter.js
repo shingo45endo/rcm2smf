@@ -153,7 +153,7 @@ export function convertGsdToSysEx(buf) {
 
 	// Drum Setup Parameter
 	for (let i = 0; i < 2; i++) {
-		const index = 0x07d6 + i * 0x148;
+		const index = 0x07d6 + i * 0x14c;
 		const bytes = buf.slice(index, index + 0x148);
 		const zeroes = new Array(128).fill(0);
 		const [level, panpot, reverb, chorus] = bytes.reduce((p, c, i) => {
@@ -189,7 +189,7 @@ export function convertGsdToSysEx(buf) {
 
 		const nibbles = [];
 
-		// [0-3] Tone Number (Bank LSB & Program Change)
+		// [0-3] Tone Number (Bank MSB & Program Change)
 		nibbles.push(...nibblize(bytes[0x00], bytes[0x01]));
 		console.assert(nibbles.length === 4, {nibbles});
 
@@ -240,7 +240,7 @@ export function convertGsdToSysEx(buf) {
 		// [80-223] Destination Controllers
 		for (let i = 0; i < 6; i++) {
 			const index = 0x37 + i * 11;
-			nibbles.push(...nibblize(...bytes.slice(index, index + 3)), 0, 0, ...nibblize(...bytes.slice(index + 3, index + 11)));
+			nibbles.push(...nibblize(...bytes.slice(index, index + 3), (i === 2 || i === 3) ? 0x40 : 0x00, ...bytes.slice(index + 3, index + 11)));
 		}
 		console.assert(nibbles.length === 224, {nibbles});
 		console.assert(nibbles.every((e) => (0x0 <= e && e < 0x10)), 'Invalid SysEx nibble', {nibbles});
