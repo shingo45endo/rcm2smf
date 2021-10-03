@@ -287,32 +287,15 @@ export async function parseRcm(buf, controlFileReader, options) {
 			track.portNo = (track.midiCh >= 0) ? Math.trunc(track.midiCh / 16) : 0;
 
 			// Reinterprets ST+ if necessary.
-			if (settings.stPlus !== 'auto') {
-				const byte = new Uint8Array([(track.stShift + 0x100) & 0xff]);
-				const view = new DataView(byte.buffer, byte.byteOffset);
-
-				switch (settings.stPlus) {
-				case 'signed':
-					{
-						const s = view.getInt8(0);
-						if (s !== track.stShift && (s < -99 || 99 < s)) {
-							console.warn(`ST+ has been converted to signed as specified. (${track.stShift} -> ${s}) But, it seems to be unsigned.`);
-						}
-						track.stShift = s;
+			if (!rcm.header.isF && !rcm.header.isG) {
+				console.assert('stShiftS' in track && 'stShiftU' in track);
+				if (settings.stPlus === 'signed') {
+					if (track.stShiftS !== track.stShift && (track.stShiftS < -99 || 99 < track.stShiftS)) {
+						console.warn(`ST+ has been converted to signed as specified. (${track.stShift} -> ${track.stShiftS}) But, it seems to be unsigned.`);
 					}
-					break;
-				case 'unsigned':
-					{
-						const u = view.getUint8(0);
-						if (u !== track.stShift && (rcm.header.isF || rcm.header.isG)) {
-							console.warn(`ST+ has been converted to unsigned as specified. (${track.stShift} -> ${u}) But, it seems to be signed.`);
-						}
-						track.stShift = u;
-					}
-					break;
-				default:
-					console.warn(`Unrecognized option: ${settings.stPlus} Ignored.`);
-					break;
+					track.stShift = track.stShiftS;
+				} else if (settings.stPlus === 'unsigned') {
+					track.stShift = track.stShiftU;
 				}
 			}
 
@@ -465,7 +448,7 @@ export function parseRcp(buf) {
 		const track = {};
 
 		// Track Header
-		const size = view.getUint16(index, true);
+		let size = view.getUint16(index, true);
 		if (size < HEADER_LENGTH || index + size > buf.length) {
 			console.warn(`Invalid track size: ${size}`);
 			break;
@@ -474,23 +457,62 @@ export function parseRcp(buf) {
 		track.trackNo  = view.getUint8(index + 2);
 		track.midiCh   = view.getInt8(index + 4);
 		track.keyShift = view.getUint8(index + 5);
-		const stShift = (rcm.header.isF) ? view.getInt8(index + 6) : view.getUint8(index + 6);
-		track.stShift = (stShift < 100) ? stShift : view.getInt8(index + 6);
+		track.stShiftS = view.getInt8(index + 6);
+		track.stShiftU = view.getUint8(index + 6);
 		track.mode     = view.getUint8(index + 7);
 		track.memo     = buf.slice(index + 8, index + 44);
 
 		// Track Events
-		track.events = buf.slice(index + HEADER_LENGTH, index + size).reduce((p, _, i, a) => {
+		let events = buf.slice(index + HEADER_LENGTH, index + size).reduce((p, _, i, a) => {
 			if (i % EVENT_LENGTH === 0) {
-				p.push(a.slice(i, i + EVENT_LENGTH));
+				const event = a.slice(i, i + EVENT_LENGTH);
+				p.push(event);
 			}
 			return p;
 		}, []);
+
+		// Checks whether the last event is End of Track to judge the track size information is reliable or not.
+		// If the track size information seems to be wrong, gets actual size by End of Track event.
+		// Note 1: A very few RCP files contain unknown "FF xx xx xx" event as if it is End of Track.
+		// Note 2: STed2 (a RECOMPOSER clone) seems to treat 16-bit track size information as 18-bit
+		// by using unused lower 2-bit. But, this program doesn't follow to such unofficial extension.
+		const lastEvent = events[events.length - 1];
+		if ((lastEvent[0] !== 0xfe && lastEvent[0] !== 0xff) || lastEvent.length !== EVENT_LENGTH) {
+			// Track Events
+			let isEot = false;
+			events = buf.slice(index + HEADER_LENGTH, buf.length).reduce((p, _, i, a) => {
+				if (i % EVENT_LENGTH === 0 && !isEot) {
+					const event = a.slice(i, i + EVENT_LENGTH);
+					if (event.length === EVENT_LENGTH) {
+						p.push(event);
+						if (event[0] === 0xfe || event[0] === 0xff) {
+							isEot = true;
+						}
+					}
+				}
+				return p;
+			}, []);
+
+			// Track size
+			const actualSize = HEADER_LENGTH + EVENT_LENGTH * events.length;
+			if (size !== actualSize) {
+				console.warn(`Track size information doesn't match the actual size: (${size} -> ${actualSize})`);
+			}
+			size = actualSize;
+		}
+
+		track.events = events;
 
 		rcm.tracks.push(track);
 
 		index += size;
 	}
+
+	// Sets ST+ for each track.
+	const isStSigned = rcm.header.isF || rcm.tracks.every((track) => (-99 <= track.stShiftS && track.stShiftS <= 99));
+	rcm.tracks.forEach((track) => {
+		track.stShift = (isStSigned) ? track.stShiftS : track.stShiftU;
+	});
 
 	return rcm;
 }
