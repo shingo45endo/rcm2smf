@@ -66,6 +66,9 @@ const options = {
 	'optimize-ctrl': {
 		describe: 'Optimize redundant SysEx generated from control files',
 	},
+	'extra-sysex-wait': {
+		describe: 'Wait for extra time after each SysEx in control files (for MT-32 Ver.1.xx)',
+	},
 	'ignore-ctrl-file': {
 		describe: 'Ignore control files',
 	},
@@ -174,7 +177,7 @@ const argv = yargs.
 	], 'SMF Generation:').
 	group([
 		'st-plus',
-		'reset-before-ctrl', 'optimize-ctrl', 'ignore-ctrl-file',
+		'reset-before-ctrl', 'optimize-ctrl', 'extra-sysex-wait', 'ignore-ctrl-file',
 		'ignore-out-of-range', 'ignore-wrong-event',
 		'max-loop-nest', 'infinity-loop-count', 'loop-bomb-threshold',
 		'roland-dev-id', 'roland-model-id', 'roland-base-addr-h', 'roland-base-addr-m',

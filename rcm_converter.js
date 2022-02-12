@@ -17,6 +17,7 @@ export const defaultSettings = {
 	stPlus: 'auto',
 	resetBeforeCtrl:  true,
 	optimizeCtrl:     true,
+	extraSysexWait:   true,
 	ignoreCtrlFile:   false,
 	ignoreOutOfRange: true,
 	ignoreWrongEvent: true,
@@ -878,7 +879,7 @@ function calcSetupMeasureTick(beatN, beatD, timeBase, minTick) {
 	return setupTick;
 }
 
-function spaceEachSysEx(sysExs, maxTick, timeBase) {
+function spaceEachSysEx(sysExs, maxTick, timeBase, isOldMt32) {
 	console.assert(sysExs && sysExs.length, 'Invalid argument', {sysExs});
 	console.assert(sysExs.length <= maxTick, 'Too many SysEx', {sysExs});
 	console.assert(maxTick >= timeBase, 'Too small tick time', {maxTick, timeBase});
@@ -898,12 +899,17 @@ function spaceEachSysEx(sysExs, maxTick, timeBase) {
 			case 0x16:	// MT-32/CM-64
 				if (addrH === 0x7f) {
 					// Waits for reset.
-					// Note: If the wait time is too short, "Exc. Buffer overflow" error occurs when receiving next SysEx. (confirmed on MT-32 Ver.1.07)
-					usec += 420 * 1000;
+					if (isOldMt32) {
+						// MT-32 Ver.1.xx requires 420 msec of delay after All Parameters Reset.
+						// Note: If the wait time is too short, "Exc. Buffer overflow" error occurs when receiving next SysEx. (confirmed on MT-32 Ver.1.07)
+						usec += 420 * 1000;
+					} else {
+						// No basis for the wait time. Makes it same as GS reset.
+						usec += 50 * 1000;
+					}
 					isReset = true;
-				} else if (0x00 < addrH && addrH <= 0x20) {
-					// It is said that MT-32 Ver.1.xx requires 40 msec of delay between SysExs.
-					// Note: Is it really needed for the later version of MT-32 and its upper compatible LA modules like CM-32L and CM-64?
+				} else if ((0x00 < addrH && addrH <= 0x20) && isOldMt32) {
+					// MT-32 Ver.1.xx requires 40 msec of delay between SysExs.
 					usec += 40 * 1000;
 				} else {
 					// DT1 needs more than 20 msec time interval.
@@ -1143,7 +1149,7 @@ export function convertRcmToSeq(rcm, options) {
 		if (sysExs.length > 0) {
 			// Decides each interval between SysExs.
 			const extraTick = calcSetupMeasureTick(initialBeat.numer, initialBeat.denom, seq.timeBase, sysExs.length);
-			const timings = spaceEachSysEx(sysExs, extraTick, seq.timeBase);
+			const timings = spaceEachSysEx(sysExs, extraTick, seq.timeBase, settings.extraSysexWait);
 			const maxUsecPerBeat = Math.max(...timings.map((e) => e.usecPerBeat));
 
 			// Sets tempo slow during sending SysExs if necessary.
