@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "description": "RECOMPOSER file (.RCP, .R36, .G36, and .MCP) to Standard MIDI File (.mid) converter",
   "engines": {
-    "node": ">=12.17"
+    "node": ">=14"
   },
   "type": "module",
   "scripts": {
@@ -20,7 +20,6 @@
   },
   "homepage": "https://github.com/shingo45endo/rcm2smf#readme",
   "dependencies": {
-    "iconv-lite": "^0.4.24",
     "yargs": "^13.2.2"
   },
   "devDependencies": {
