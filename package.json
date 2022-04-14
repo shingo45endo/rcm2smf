@@ -6,11 +6,6 @@
     "node": ">=12.17"
   },
   "type": "module",
-  "main": "rcm2smf.js",
-  "module": "rcm2smf.js",
-  "bin": {
-    "rcm2smf": "rcm2smf.js"
-  },
   "scripts": {
     "lint": "eslint {*.js,*.html}"
   },
