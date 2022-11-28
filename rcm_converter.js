@@ -1229,6 +1229,7 @@ export function convertRcmToSeq(rcm, options) {
 	const isAllPortSame = ((new Set(rcm.tracks.map((e) => e.portNo))).size === 1);
 	const isNoteOff = (rcm.header.isMCP) ? ((gt, st) => (gt < st)) : ((gt, st) => (gt <= st));
 	let maxDuration = 0;
+	const tempoEventMap = new Map();
 	for (const rcmTrack of rcm.tracks) {
 		// Skips the track if it is empty or muted.
 		if (!rcmTrack.extractedEvents || rcmTrack.extractedEvents.length <= 1 || (rcmTrack.mode & 0x01) !== 0) {
@@ -1465,11 +1466,7 @@ export function convertRcmToSeq(rcm, options) {
 
 				case EVENT.TEMPO:
 					if (validateRange((gt > 0), `Invalid tempo rate: ${gt}`)) {	// Note: It can be greater than 255 in G36.
-						if (vel !== 0) {
-							// TODO: Support tempo gradation.
-							console.warn(`Tempo gradation is not supported yet: ${vel}`);
-						}
-						setEvent(conductorTrack, timestamp, makeMetaTempo(60 * 1000 * 1000 * 64.0 / (rcm.header.tempo * gt)));
+						tempoEventMap.set(timestamp, event);
 					}
 					break;
 
@@ -1625,7 +1622,75 @@ export function convertRcmToSeq(rcm, options) {
 	// End of Track for the conductor track
 	setEvent(conductorTrack, maxDuration, [0xff, 0x2f, 0x00]);
 
+	// Makes tempo meta events.
+	addTempoEvents(tempoEventMap);
+
 	return seq;
+
+	// Note: The process of the tempo gradation is different from the original Recomposer's algorithm.
+	function addTempoEvents(tempoEventMap) {
+		// Table of step time during graduation from CVS.EXE Ver 5.06 (1995-08-29) [0x00dcd8-0x00ddd7]
+		const gradSteps = [
+			NaN, 255, 225, 208, 195, 186, 178, 171, 165, 160, 156, 151, 148, 144, 141, 138,
+			135, 132, 130, 128, 125, 123, 121, 119, 117, 116, 114, 112, 111, 109, 108, 106,
+			105, 104, 102, 101, 100,  99,  98,  96,  95,  94,  93,  92,  91,  90,  89,  88,
+			 87,  86,  86,  85,  84,  83,  82,  81,  81,  80,  79,  78,  78,  77,  76,  76,
+			 75,  74,  74,  73,  72,  72,  71,  70,  70,  69,  69,  68,  67,  67,  66,  66,
+			 65,  65,  64,  64,  63,  63,  62,  62,  61,  61,  60,  60,  59,  59,  58,  58,
+			 57,  57,  56,  56,  56,  55,  55,  54,  54,  53,  53,  53,  52,  52,  51,  51,
+			 51,  50,  50,  49,  49,  49,  48,  48,  48,  47,  47,  47,  46,  46,  45,  45,
+			 45,  44,  44,  44,  43,  43,  43,  42,  42,  42,  42,  41,  41,  41,  40,  40,
+			 40,  39,  39,  39,  38,  38,  38,  38,  37,  37,  37,  36,  36,  36,  36,  35,
+			 35,  35,  35,  34,  34,  34,  33,  33,  33,  33,  32,  32,  32,  32,  31,  31,
+			 31,  31,  30,  30,  30,  30,  29,  29,  29,  29,  29,  28,  28,  28,  28,  27,
+			 27,  27,  27,  26,  26,  26,  26,  26,  25,  25,  25,  25,  25,  24,  24,  24,
+			 24,  23,  23,  23,  23,  23,  22,  22,  22,  22,  22,  21,  21,  21,  21,  21,
+			 20,  20,  20,  20,  20,  20,  19,  19,  19,  19,  19,  18,  18,  18,  18,  18,
+			 17,  17,  17,  17,  17,  17,  16,  16,  16,  16,  16,  16,  15,  15,  15,  15,
+		];
+
+		let currentTempo = rcm.header.tempo;
+		let gradTempoMap = null;
+		for (let timestamp = 0; timestamp < maxDuration; timestamp++) {
+			const oldTempo = currentTempo;
+
+			// Checks if a tempo event exists.
+			if (tempoEventMap.has(timestamp)) {
+				const [cmd, _, gt, vel] = tempoEventMap.get(timestamp);
+				console.assert(cmd === EVENT.TEMPO);
+
+				if (vel === 0) {	// Normal tempo change
+					gradTempoMap = null;	// Cancels tempo graduation.
+					currentTempo = Math.trunc(rcm.header.tempo * gt / 64.0);
+
+				} else {	// Tempo change with graduation
+					const targetTempo = Math.trunc(rcm.header.tempo * gt / 64.0);
+					const gradSt = gradSteps[vel];
+
+					// Calculates future tempo values.
+					gradTempoMap = new Map();
+					for (let i = 0; i < gradSt; i += 2) {
+						const gradTimestamp = timestamp + Math.trunc(i * rcm.header.timeBase / 48.0);
+						const gradTempo = Math.trunc(currentTempo + (targetTempo - currentTempo) * i / gradSt);
+						gradTempoMap.set(gradTimestamp, gradTempo);
+					}
+					gradTempoMap.set(timestamp + Math.trunc(gradSt * rcm.header.timeBase / 48.0), targetTempo);
+				}
+			}
+
+			// If in the "Tempo graduation", updates the current tempo with the pre-calculated tempo values.
+			if (gradTempoMap) {
+				if (gradTempoMap.has(timestamp)) {
+					currentTempo = gradTempoMap.get(timestamp);
+				}
+			}
+
+			// Adds tempo meta event if necessary.
+			if (currentTempo !== oldTempo) {
+				setEvent(conductorTrack, timestamp, makeMetaTempo(60 * 1000 * 1000 / currentTempo));
+			}
+		}
+	}
 
 	function setEvent(map, timestamp, bytes) {
 		console.assert(map instanceof Map, 'Invalid argument', {map});
