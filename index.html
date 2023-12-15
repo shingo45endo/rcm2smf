@@ -50,7 +50,7 @@ const decodeNec932 = (() => {
 
 	return (bytes) => {
 		// Checks whether the bytes seem to contain NEC box-drawing characters.
-		if ([...bytes].some((e, i, a) => isPc98BoxDrawing((i > 0) && (a[i - 1] << 8) | e))) {	// It allows false positive.
+		if ([...bytes].some((e, i, a) => (i > 0) && isPc98BoxDrawing((a[i - 1] << 8) | e))) {	// It allows false positive.
 			// Separates from the bytes to each character code according to Shift_JIS encoding.
 			let leadingByte = -1;
 			const charArrays = [...bytes].reduce((p, c) => {
@@ -67,7 +67,7 @@ const decodeNec932 = (() => {
 
 			// Replaces NEC box-drawing characters into Unicode's ones.
 			return charArrays.map((e) => {
-				const cp932code =  (e[0] << 8) | e[1];
+				const cp932code = e.reduce((p, c) => (p << 8) | c);
 				return (isPc98BoxDrawing(cp932code) ? String.fromCodePoint(cp932code - 0x61a2) : decoder.decode(new Uint8Array(e)));
 			}).join('');
 
