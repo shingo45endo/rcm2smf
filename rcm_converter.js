@@ -1,7 +1,7 @@
 import {convertMtdToSysEx, convertCm6ToSysEx, convertGsdToSysEx, isSysExRedundant} from './rcm_ctrl_converter.js';
 
 // Default settings of this converter.
-export const defaultSettings = {
+export const defaultSettings = Object.freeze({
 	metaTextMemo:      true,
 	metaTextComment:   true,
 	metaTextUsrExc:    true,
@@ -32,10 +32,9 @@ export const defaultSettings = {
 	yamahaModelId:   0x4c,
 	yamahaBaseAddrH: 0x00,
 	yamahaBaseAddrM: 0x00,
-};
-Object.freeze(defaultSettings);
+});
 
-const EVENT_MCP = {
+const EVENT_MCP = Object.freeze({
 	UsrExc0:     -1,
 	UsrExc1:     -1,
 	UsrExc2:     -1,
@@ -89,10 +88,9 @@ const EVENT_MCP = {
 	TrackEnd:  0xfe,	// End of Track
 	CMU_800:   0xf9,	// CMU-800
 	UserPrg:   0xe0,	// Program Change (User Program)
-};
-Object.freeze(EVENT_MCP);
+});
 
-const EVENT_RCP = {
+const EVENT_RCP = Object.freeze({
 	UsrExc0:   0x90,	// User Exclusive 0
 	UsrExc1:   0x91,	// User Exclusive 1
 	UsrExc2:   0x92,	// User Exclusive 2
@@ -146,8 +144,7 @@ const EVENT_RCP = {
 	TrackEnd:  0xfe,	// End of Track
 	CMU_800:     -1,
 	UserPrg:     -1,
-};
-Object.freeze(EVENT_RCP);
+});
 
 export async function rcm2smf(buf, controlFileReader, options) {
 	// Checks the arguments.

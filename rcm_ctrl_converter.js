@@ -263,7 +263,7 @@ function checkSum(bytes) {
 	return (0x80 - (sum & 0x7f)) & 0x7f;
 }
 
-const initialValues = {
+const initialValues = Object.freeze({
 	// MT-32/CM-64
 	0x16: {
 		// [LA SOUND PART]
@@ -716,8 +716,7 @@ const initialValues = {
 		0x48: [],
 		0x49: [],
 	},
-};
-Object.freeze(initialValues);
+});
 
 export function isSysExRedundant(bytes) {
 	// Checks the argument.
