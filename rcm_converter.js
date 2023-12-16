@@ -214,7 +214,7 @@ export async function parseRcm(buf, controlFileReader, options) {
 	// Parses the data as RCP format. If it failed, parses it again as G36 format. If it failed again, try MCP parser.
 	const rcm = parseRcp(buf) || parseG36(buf) || parseMcp(buf);
 	if (!rcm) {
-		throw new Error('Not RECOMPOSER file');
+		throw new Error('Not Recomposer file');
 	}
 
 	// Reads and parses control files.
@@ -475,7 +475,7 @@ export function parseRcp(buf) {
 		// Checks whether the last event is End of Track to judge the track size information is reliable or not.
 		// If the track size information seems to be wrong, gets actual size by End of Track event.
 		// Note 1: A very few RCP files contain unknown "FF xx xx xx" event as if it is End of Track.
-		// Note 2: STed2 (a RECOMPOSER clone) seems to treat 16-bit track size information as 18-bit
+		// Note 2: STed2 (a Recomposer clone) seems to treat 16-bit track size information as 18-bit
 		// by using unused lower 2-bit. But, this program doesn't follow to such unofficial extension.
 		const lastEvent = events[events.length - 1];
 		if ((lastEvent[0] !== 0xfe && lastEvent[0] !== 0xff) || lastEvent.length !== EVENT_LENGTH) {
