@@ -4,7 +4,9 @@ import util from 'util';
 import assert from 'assert';
 
 import yargs from 'yargs';
+
 import {rcm2smf, defaultSettings} from './rcm_converter.js';
+import {decodeNec932} from './nec932_decoder.js';
 
 // Options for yargs.
 const options = {
@@ -209,27 +211,6 @@ console.assert = (argv.debug) ? assert : () => {/* EMPTY */};
 const readFileAsync  = util.promisify(fs.readFile);
 const writeFileAsync = util.promisify(fs.writeFile);
 
-// Makes a file reader for control files.
-const fileReader = (() => {
-	const decoderCp932 = new util.TextDecoder('Shift_JIS');
-
-	return (fileName, fileNameRaw) => {
-		console.assert(fileName, 'Invalid argument');
-
-		const baseDir = path.parse(rcmFile).dir;
-		if (/^[\x20-\x7E]*$/u.test(fileName)) {
-			return readFileAsync(path.join(baseDir, fileName));
-
-		} else if (fileNameRaw) {
-			const fileNameCP932 = decoderCp932.decode(fileNameRaw);
-			return readFileAsync(path.join(baseDir, fileNameCP932));
-
-		} else {
-			return Promise.reject(new Error('File not found'));
-		}
-	};
-})();
-
 // Converts an RCM file to a Standard MIDI File.
 (async () => {
 	try {
@@ -239,4 +220,20 @@ const fileReader = (() => {
 	} catch (e) {
 		console.error((settings.debug) ? e : `${e}`);
 	}
+
+	function fileReader(fileName, fileNameRaw) {
+		console.assert(fileName, 'Invalid argument');
+
+		const baseDir = path.parse(rcmFile).dir;
+		if (/^[\x20-\x7E]*$/u.test(fileName)) {
+			return readFileAsync(path.join(baseDir, fileName));
+
+		} else if (fileNameRaw) {
+			const fileNameCP932 = decodeNec932(fileNameRaw);
+			return readFileAsync(path.join(baseDir, fileNameCP932));
+
+		} else {
+			return Promise.reject(new Error('File not found'));
+		}
+	};
 })();
