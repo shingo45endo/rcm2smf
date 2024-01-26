@@ -116,10 +116,10 @@ const EVENT_RCP = Object.freeze({
 	DX7_2_A:   0xcd,	// DX7-2 ACED
 	DX7_2_P:   0xce,	// DX7-2 PCED
 	TX802_P:   0xcf,	// TX802 PCED
-	YamBase:   0xd0,	// YAMAHA Base Address
-	YamDev:    0xd1,	// YAMAHA Dev# & Model ID
-	YamPara:   0xd2,	// YAMAHA Address & Parameter
-	XGPara:    0xd3,	// YAMAHA XG Address & Parameter
+	YamBase:   0xd0,	// Yamaha Base Address
+	YamDev:    0xd1,	// Yamaha Dev# & Model ID
+	YamPara:   0xd2,	// Yamaha Address & Parameter
+	XGPara:    0xd3,	// Yamaha XG Address & Parameter
 	MKS_7:     0xdc,	// Roland MKS-7
 	RolBase:   0xdd,	// Roland Base Address
 	RolPara:   0xde,	// Roland Address & Parameter
@@ -208,7 +208,7 @@ export async function parseRcm(buf, controlFileReader, options) {
 	// Makes a settings object from the default settings and the specified ones.
 	const settings = {...defaultSettings, ...options};
 
-	// Parses the data as RCP format. If it failed, parses it again as G36 format. If it failed again, try MCP parser.
+	// Parses the data as RCP format. If it failed, parses it again as G36 format. If it failed again, tries MCP parser.
 	const rcm = parseRcp(buf) || parseG36(buf) || parseMcp(buf);
 	if (!rcm) {
 		throw new Error('Not Recomposer file');
@@ -445,7 +445,7 @@ export function parseRcp(buf) {
 
 		const track = {};
 
-		// Track Header
+		// Track header
 		let size = view.getUint16(index, true);
 		if (size < HEADER_LENGTH || index + size > buf.length) {
 			console.warn(`Invalid track size: ${size}`);
@@ -460,7 +460,7 @@ export function parseRcp(buf) {
 		track.mode     = view.getUint8(index + 7);
 		track.memo     = buf.slice(index + 8, index + 44);
 
-		// Track Events
+		// Track events
 		let events = buf.slice(index + HEADER_LENGTH, index + size).reduce((p, _, i, a) => {
 			if (i % EVENT_LENGTH === 0) {
 				const event = a.slice(i, i + EVENT_LENGTH);
@@ -476,7 +476,7 @@ export function parseRcp(buf) {
 		// by using unused lower 2-bit. But, this program doesn't follow to such unofficial extension.
 		const lastEvent = events[events.length - 1];
 		if ((lastEvent[0] !== 0xfe && lastEvent[0] !== 0xff) || lastEvent.length !== EVENT_LENGTH) {
-			// Track Events
+			// Track events
 			let isEot = false;
 			events = buf.slice(index + HEADER_LENGTH, buf.length).reduce((p, _, i, a) => {
 				if (i % EVENT_LENGTH === 0 && !isEot) {
@@ -565,7 +565,7 @@ export function parseG36(buf) {
 
 		const track = {};
 
-		// Track Header
+		// Track header
 		const size = view.getUint32(index, true);
 		if (size < HEADER_LENGTH || index + size > buf.length) {
 			console.warn(`Invalid track size: ${size}`);
@@ -579,7 +579,7 @@ export function parseG36(buf) {
 		track.mode     = view.getUint8(index + 9);
 		track.memo     = buf.slice(index + 10, index + 46);
 
-		// Track Events
+		// Track events
 		track.events = buf.slice(index + HEADER_LENGTH, index + size).reduce((p, _, i, a) => {
 			if (i % EVENT_LENGTH === 0) {
 				p.push(a.slice(i, i + EVENT_LENGTH));
@@ -1241,7 +1241,7 @@ export function convertRcmToSeq(rcm, options) {
 		let {chNo, portNo, midiCh} = rcmTrack;
 		let rolDev, rolBase, yamDev, yamBase;	// TODO: Investigate whether they belong to track or global.
 
-		// Track Name
+		// Track name
 		setMetaTrackName(smfTrack, 0, rcmTrack.memo);
 
 		// If any port No. are not same among all the track, adds an unofficial MIDI Port meta event. (FF 21 01 pp)
@@ -1399,7 +1399,7 @@ export function convertRcmToSeq(rcm, options) {
 					}
 					break;
 
-				// 1-byte parameter change SysEx for YAMAHA XG devices
+				// 1-byte parameter change SysEx for Yamaha XG devices
 				case EVENT.YamBase:
 					if (validateRange(isIn7bitRange(gt, vel), `Invalid YamBase event: [${hexStr(event)}]`)) {
 						yamBase = [gt, vel];
@@ -1624,7 +1624,7 @@ export function convertRcmToSeq(rcm, options) {
 
 	return seq;
 
-	// Note: The process of the tempo gradation is different from the original Recomposer's algorithm.
+	// Note: The process of the tempo graduation is different from the original Recomposer's algorithm.
 	function addTempoEvents(tempoEventMap) {
 		// Table of step time during graduation from CVS.EXE Ver 5.06 (1995-08-29) [0x00dcd8-0x00ddd7]
 		const gradSteps = [

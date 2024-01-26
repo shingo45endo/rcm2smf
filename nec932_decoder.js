@@ -42,7 +42,7 @@ function isPc98DependentChars(cp932code) {
 }
 
 export function decodeNec932(bytes) {
-	// Checks whether the bytes seem to contain NEC box-drawing characters.
+	// Checks whether the bytes seem to contain PC-98 dependent characters.
 	if ([...bytes].some((e, i, a) => (i > 0) && isPc98DependentChars((a[i - 1] << 8) | e))) {	// It allows false positive.
 		// Separates from the bytes to each character code according to Shift_JIS encoding.
 		let leadingByte = -1;
@@ -80,4 +80,3 @@ export function decodeNec932(bytes) {
 		return decoder.decode(bytes);
 	}
 }
-
