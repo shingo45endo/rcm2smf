@@ -639,7 +639,7 @@ function extractEvents(events, timeBase, isMCP, settings) {
 					extractedEvents.push([EVENT.MeasEnd, 0x00, 0xfc, 0x02]);
 				}
 
-				// Moves the current index to the measure.	// TODO: Avoid infinity loop
+				// Moves the current index to the measure.
 				let counter = 0;
 				while (events[index][0] === EVENT.SameMeas) {
 					const [cmd, measure, offset] = convertEvent(events[index]);
@@ -649,7 +649,10 @@ function extractEvents(events, timeBase, isMCP, settings) {
 					validateAndThrow(Number.isInteger(index) && (0 <= index && index < events.length), `Invalid Same Measure event: ${{cmd, measure, offset}}`);
 
 					counter++;
-					validateAndThrow(counter < 100, `Detected infinity Same Measure reference.`);
+					if (counter >= 100) {
+						console.warn('Detected an infinity Same Measure reference. Skipped.');
+						break;
+					}
 				}
 			}
 			continue;
