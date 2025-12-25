@@ -165,7 +165,7 @@ const makeEventLists = (() => {
 					return table.hex(value);
 				}
 			},
-			dummy: () => ` ---`,
+			dummy: () => ' ---',
 
 			hexesP: (values) => values.map((e) => table.hex(e)).join(','),
 			charsP: (values) => values.map((e) => table.char(e)).join(','),
@@ -633,14 +633,14 @@ $(() => {
 		const $rcmPage = $(makeElementFromTemplateId('my-rcmFile'));
 
 		// Title
-		$(`.my-title`, $rcmPage).text(decodeNec932(rcm.header.title));
+		$('.my-title', $rcmPage).text(decodeNec932(rcm.header.title));
 
 		// File name
-		const $rcmSmfFileName = $(`.my-rcmSmfFileName`, $rcmPage);
+		const $rcmSmfFileName = $('.my-rcmSmfFileName', $rcmPage);
 		$rcmSmfFileName.val(`${name}.mid`);
 
 		// Convert
-		$(`.my-convertRcm`, $rcmPage).on('click', ((rcmFileName, smfFileName) => async function() {
+		$('.my-convertRcm', $rcmPage).on('click', ((rcmFileName, smfFileName) => async function() {
 			emptyLogs();
 			try {
 				const rcm = await parseRcm(contents[rcmFileName].buf, getContent, currentSettings);
@@ -664,7 +664,7 @@ $(() => {
 
 		// Key
 		const tonic = ['C', 'G', 'D', 'A', 'E', 'B', 'F#', 'C#', 'C', 'F', 'Bb', 'Eb', 'Ab', 'Db', 'Gb', 'Cb', 'A', 'E', 'B', 'F#', 'C#', 'G#', 'D#', 'A#', 'A', 'D', 'G', 'C', 'F', 'Bb', 'Eb', 'Ab'][rcm.header.key & 0x1f];
-		$(`.my-key`, $rcmPage).text(`${tonic} ${(rcm.header.key < 0x10) ? 'Major' : 'Minor'}`);
+		$('.my-key', $rcmPage).text(`${tonic} ${(rcm.header.key < 0x10) ? 'Major' : 'Minor'}`);
 
 		// Control files
 		['MTD', 'CM6', 'GSD', 'GSD2'].forEach((key) => {
@@ -772,14 +772,14 @@ $(() => {
 		const $ctrlPage = $(makeElementFromTemplateId('my-ctrlFile'));
 
 		// File name
-		const $ctrlSyxFileName = $(`.my-ctrlSyxFileName`, $ctrlPage);
+		const $ctrlSyxFileName = $('.my-ctrlSyxFileName', $ctrlPage);
 		$ctrlSyxFileName.val(`${name}.syx`);
 
-		const $ctrlSmfFileName = $(`.my-ctrlSmfFileName`, $ctrlPage);
+		const $ctrlSmfFileName = $('.my-ctrlSmfFileName', $ctrlPage);
 		$ctrlSmfFileName.val(`${name}.mid`);
 
 		// Convert
-		$(`.my-convertCtrlSyx`, $ctrlPage).on('click', ((ctrlFileName, syxFileName) => function() {
+		$('.my-convertCtrlSyx', $ctrlPage).on('click', ((ctrlFileName, syxFileName) => function() {
 			emptyLogs();
 			try {
 				const bytesIn = contents[ctrlFileName].buf;
@@ -796,7 +796,7 @@ $(() => {
 			return true;
 		})(name, $ctrlSyxFileName.val()));
 
-		$(`.my-convertCtrlSmf`, $ctrlPage).on('click', ((ctrlFileName, smfFileName) => function() {
+		$('.my-convertCtrlSmf', $ctrlPage).on('click', ((ctrlFileName, smfFileName) => function() {
 			emptyLogs();
 			try {
 				const smf = ctrl2smf(contents[ctrlFileName].buf, ctrlFileName, currentSettings);
@@ -868,11 +868,11 @@ $(() => {
 	});
 
 	// Adds "Help" pane.
-	$('#my-fileTabs').append($(`<li class="nav-item"><a id="my-tab-help" class="nav-link" href="#my-pane-help" role="tab" data-toggle="tab">Help</a></li>`));
-	$('#my-filePanes').append($(`<div id="my-pane-help" class="tab-pane fade" role="tabpanel"></div>`));
+	$('#my-fileTabs').append($('<li class="nav-item"><a id="my-tab-help" class="nav-link" href="#my-pane-help" role="tab" data-toggle="tab">Help</a></li>'));
+	$('#my-filePanes').append($('<div id="my-pane-help" class="tab-pane fade" role="tabpanel"></div>'));
 	$('#my-pane-help').append($(makeElementFromTemplateId('my-help')));
 	$('#my-pane-help .my-helpText').append(marked(document.getElementById('my-markdown').content.textContent, {headerIds: false}));
-	$(`#my-tab-help`).tab('show');
+	$('#my-tab-help').tab('show');
 
 	/* eslint-enable no-invalid-this */
 });

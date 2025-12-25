@@ -712,7 +712,7 @@ function extractEvents(events, timeBase, isMCP, settings) {
 				}
 
 			} else {
-				console.warn(`Detected a dangling Loop End event. Skipped.`);
+				console.warn('Detected a dangling Loop End event. Skipped.');
 				index++;
 			}
 			break;
@@ -808,7 +808,7 @@ function extractRhythm(seqEvents, patternEvents, settings) {
 	const patterns = patternEvents.reduce((p, c, i, a) => {
 		if (i % (16 + 1) === 0 && c[0] !== EVENT_MCP.TrackEnd) {
 			const pattern = a.slice(i, i + 16);
-			if (validate(pattern.length === 16 && a[i + 16][0] === EVENT_MCP.MeasEnd, `Invalid rhythm pattern.`)) {
+			if (validate(pattern.length === 16 && a[i + 16][0] === EVENT_MCP.MeasEnd, 'Invalid rhythm pattern.')) {
 				p.push(pattern);
 			} else {
 				// Adds a dummy data.

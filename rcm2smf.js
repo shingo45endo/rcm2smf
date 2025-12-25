@@ -162,7 +162,7 @@ const argv = yargs.
 
 		// Initial reset SysEx cannot be omitted when optimizing SysEx generated from control files.
 		if (argv.optimizeCtrl && !argv.resetBeforeCtrl) {
-			throw new Error(`In case of optimizing SysEx for control files, adding an initial reset SysEx is needed.\n(Use "--reset-before-ctrl" or "--no-optimize-ctrl")`);
+			throw new Error('In case of optimizing SysEx for control files, adding an initial reset SysEx is needed.\n(Use "--reset-before-ctrl" or "--no-optimize-ctrl")');
 		}
 
 		return true;
