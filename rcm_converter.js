@@ -1895,10 +1895,6 @@ function rawTrim(bytes, bits = 0b11) {
 	console.assert(bytes && 'length' in bytes, 'Invalid argument', {bytes});
 	console.assert(Number.isInteger(bits) && (bits & ~0b11) === 0, 'Invalid argument', {bits});
 
-	if (bytes.every((e) => e === 0x20)) {
-		return new Uint8Array();
-	}
-
 	const begin = ((bits & 0b01) === 0) ? 0         : bytes.findIndex((e) => e !== 0x20);
 	const end   = ((bits & 0b10) === 0) ? undefined : String.fromCharCode(...bytes).replace(/\x20+$/u, '').length;
 
