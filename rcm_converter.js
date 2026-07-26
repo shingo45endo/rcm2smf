@@ -418,8 +418,8 @@ export function parseRcp(buf) {
 	rcm.header.key      = view.getUint8(0x01c4);
 	rcm.header.playBias = view.getInt8(0x01c5);
 
-	rcm.header.fileNameCM6 = rawTrim(rawTrimNul(buf.slice(0x01c6, 0x01d2)));
-	rcm.header.fileNameGSD = rawTrim(rawTrimNul(buf.slice(0x01d6, 0x01e2)));
+	rcm.header.fileNameCM6 = rawTrim(rawTrimNul(buf.slice(0x01c6, 0x01d6)));
+	rcm.header.fileNameGSD = rawTrim(rawTrimNul(buf.slice(0x01d6, 0x01e6)));
 
 	const trackNum = view.getUint8(0x01e6);
 	rcm.header.maxTracks = (trackNum === 0) ? 18 : trackNum;
