@@ -2,34 +2,13 @@
 <html>
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0"> 
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>rcm2smf</title>
-<link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css" integrity="sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T" crossorigin="anonymous">
-<script src="https://code.jquery.com/jquery-3.3.1.slim.min.js" integrity="sha384-q8i/X+965DzO0rT7abK41JStQIAqVgRVzpbzo5smXKp4YfRvH+8abtTE1Pi6jizo" crossorigin="anonymous"></script>
-<script src="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/js/bootstrap.min.js" integrity="sha384-JjSmVgyd0p3pXB1rRibZUAYoIIy6OrQ6VrjIEaFf/nJGzIxFDsf4x0xIM+B07jRM" crossorigin="anonymous"></script>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-sRIl4kxILFvY47J16cr9ZwB07vP4J8+LH7qKQnuqkuIAvNWLzeN8tE5YBujZqJLB" crossorigin="anonymous">
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js" integrity="sha384-FKyoEForCGlyvwx9Hj09JcYn3nv7wiPVlz7YYwJrWVcXK/BmnVDxM+D2scQbITxI" crossorigin="anonymous"></script>
 <script src="https://cdn.jsdelivr.net/npm/marked@3.0.8/marked.min.js"></script>
-<script>
-/* global $, marked */
-/* eslint-disable strict, prefer-arrow-callback */
-'use strict';
-$(function() {
-	// Checks whether the browser supports necessary functionalities.
-	if (!(window.Promise) ||
-	    !(window.Map && window.Set) ||
-	    !(window.File && window.FileList && window.FileReader) ||
-	    !(window.TextDecoder)) {
-
-		// Adds warning message.
-		$('main').prepend($('<div class="alert alert-danger" role="alert">This application doesn\'t work on your browser.</div>'));
-
-		// Adds how to use.
-		const text = (document.getElementById('my-markdown').content || $('#my-markdown')[0]).textContent;
-		$('#my-filePanes').append($(marked(text, {headerIds: false})));
-	}
-});
-/* eslint-enable strict, prefer-arrow-callback */
-</script>
 <script type="module">
+/* global bootstrap, marked */
 import {parseRcm, convertRcmToSeq, convertSeqToSmf, ctrl2smf, defaultSettings} from './rcm_converter.js';
 import {convertMtdToSysEx, convertCm6ToSysEx, convertGsdToSysEx, isSysExRedundant} from './rcm_ctrl_converter.js';
 import {decodeNec932} from './nec932_decoder.js';
@@ -452,25 +431,24 @@ const makeEventLists = (() => {
 	})[kind](events);
 })();
 
-/* global $, marked */
-$(() => {
+document.addEventListener('DOMContentLoaded', () => {
 	/* eslint-disable no-invalid-this */
 
 	// Replaces the default console functions.
 	['info', 'warn', 'error'].forEach((kind) => {
 		((func) => {
-			const $log = $('#my-log');
-			const $logs = $('#my-logs');
-			const $errors = $('#my-errors');
+			const elemLog = document.getElementById('my-log');
+			const elemLogs = document.getElementById('my-logs');
+			const elemErrors = document.getElementById('my-errors');
 
 			console[kind] = (...args) => {
 				const mes = args.join('');
-				$log.text(`${kind}: ${mes}`);
-				$logs.append(`<li>${mes}</li>`);
+				elemLog.textContent = `${kind}: ${mes}`;
+				elemLogs.insertAdjacentHTML('beforeend', `<li>${mes}</li>`);
 
 				if (kind === 'error') {
-					$errors.append(`<li>${mes}</li>`);
-					$('#my-errorModal').modal('show');
+					elemErrors.insertAdjacentHTML('beforeend', `<li>${mes}</li>`);
+					(new bootstrap.Modal(document.getElementById('my-errorModal'))).show();
 				}
 
 				func(...args);
@@ -479,8 +457,8 @@ $(() => {
 	});
 
 	function emptyLogs() {
-		$('#my-logs').empty();
-		$('#my-errors').empty();
+		document.getElementById('my-logs').innerHTML = '';
+		document.getElementById('my-errors').innerHTML = '';
 	}
 
 	const makeElementFromTemplateId = (() => {
@@ -493,42 +471,47 @@ $(() => {
 	})();
 
 	const currentSettings = {...defaultSettings};
-	$('#my-settingsModal').on('show.bs.modal', () => {
+	document.getElementById('my-settingsModal').addEventListener('show.bs.modal', () => {
 		for (const key of Object.keys(currentSettings)) {
 			const value = currentSettings[key];
-			const $elem = $(`#my-${key}`);
+			const elem = document.getElementById(`my-${key}`);
 
-			switch (typeof value) {
-			case 'string':
-			case 'number':
-				$elem.val(value);
-				break;
-			case 'boolean':
-				$elem.prop('checked', value);
-				break;
-			default:
-				console.assert(false);
-				break;
+			if (elem) {
+				switch (typeof value) {
+				case 'string':
+				case 'number':
+					elem.value = value;
+					break;
+				case 'boolean':
+					elem.checked = value;
+					break;
+				default:
+					console.assert(false);
+					break;
+				}
 			}
 		}
 	});
-	$('#my-saveChanges').on('click', () => {
-		for (const key of Object.keys(currentSettings)) {
-			const $elem = $(`#my-${key}`);
 
-			switch (typeof currentSettings[key]) {
-			case 'string':
-				currentSettings[key] = $elem.val();
-				break;
-			case 'number':
-				currentSettings[key] = Number($elem.val());
-				break;
-			case 'boolean':
-				currentSettings[key] = $elem.prop('checked');
-				break;
-			default:
-				console.assert(false);
-				break;
+	document.getElementById('my-saveChanges').addEventListener('click', () => {
+		for (const key of Object.keys(currentSettings)) {
+			const elem = document.getElementById(`my-${key}`);
+
+			if (elem) {
+				switch (typeof currentSettings[key]) {
+				case 'string':
+					currentSettings[key] = elem.value;
+					break;
+				case 'number':
+					currentSettings[key] = Number(elem.value);
+					break;
+				case 'boolean':
+					currentSettings[key] = elem.checked;
+					break;
+				default:
+					console.assert(false);
+					break;
+				}
 			}
 		}
 	});
@@ -560,23 +543,23 @@ $(() => {
 		const paneId = `my-pane-${id}`;
 
 		// Removes both tab and pane.
-		$(`#${tabId}`).remove();
-		$(`#${paneId}`).remove();
+		document.getElementById(tabId)?.closest('li')?.remove();
+		document.getElementById(paneId)?.remove();
 
 		// Adds a new tab and a new pane.
-		$('#my-fileTabs').append($(`
+		document.getElementById('my-fileTabs').insertAdjacentHTML('beforeend', `
 			<li class="nav-item">
-				<a id="${tabId}" class="nav-link" href="#${paneId}" role="tab" data-toggle="tab">${name}</a>
-			</li>`));
-		$('#my-filePanes').append($(`<div id="${paneId}" class="tab-pane fade" role="tabpanel"></div>`));
+				<a id="${tabId}" class="nav-link" href="#${paneId}" role="tab" data-bs-toggle="tab">${name}</a>
+			</li>`);
+		document.getElementById('my-filePanes').insertAdjacentHTML('beforeend', `<div id="${paneId}" class="tab-pane fade" role="tabpanel"></div>`);
 
 		// Creates a page and appends it to the pane.
 		switch (content.kind) {
 		case 'rcm':
-			$(`#${paneId}`).append(makeRcmPage(content.rcm, id, name));
+			document.getElementById(paneId).appendChild(makeRcmPage(content.rcm, id, name));
 			break;
 		case 'ctrl':
-			$(`#${paneId}`).append(makeCtrlPage(content.sysExs, name));
+			document.getElementById(paneId).appendChild(makeCtrlPage(content.sysExs, name));
 			break;
 		default:
 			console.assert(false);
@@ -584,7 +567,10 @@ $(() => {
 		}
 
 		// Chooses the first track.
-		$(`#${paneId} .my-trackTabs a.nav-link:first`).tab('show');
+		const elemFirstTrackTab = document.getElementById(paneId).querySelector('.my-trackTabs a.nav-link');
+		if (elemFirstTrackTab) {
+			(new bootstrap.Tab(elemFirstTrackTab)).show();
+		}
 	}
 
 	async function parseContent(file) {
@@ -630,17 +616,18 @@ $(() => {
 	}
 
 	function makeRcmPage(rcm, id, name) {
-		const $rcmPage = $(makeElementFromTemplateId('my-rcmFile'));
+		const elemRcmPage = document.createElement('div');
+		elemRcmPage.appendChild(makeElementFromTemplateId('my-rcmFile'));
 
 		// Title
-		$('.my-title', $rcmPage).text(decodeNec932(rcm.header.title));
+		elemRcmPage.querySelector('.my-title').textContent = decodeNec932(rcm.header.title);
 
 		// File name
-		const $rcmSmfFileName = $('.my-rcmSmfFileName', $rcmPage);
-		$rcmSmfFileName.val(`${name}.mid`);
+		const elemRcmSmfFileName = elemRcmPage.querySelector('.my-rcmSmfFileName');
+		elemRcmSmfFileName.value = `${name}.mid`;
 
 		// Convert
-		$('.my-convertRcm', $rcmPage).on('click', ((rcmFileName, smfFileName) => async function() {
+		elemRcmPage.querySelector('.my-convertRcm').addEventListener('click', ((rcmFileName, elemFileName) => async function(e) {
 			emptyLogs();
 			try {
 				const rcm = await parseRcm(contents[rcmFileName].buf, getContent, currentSettings);
@@ -648,50 +635,50 @@ $(() => {
 				const smf = convertSeqToSmf(seq, rcm.header.timeBase, currentSettings);
 				const blob = new Blob([smf], {type: 'audio/midi'});
 
-				$(this).attr('download', smfFileName);
-				$(this).attr('href', URL.createObjectURL(blob));
-			} catch (e) {
-				console.error(e);
+				this.setAttribute('download', elemFileName.value);
+				this.setAttribute('href', URL.createObjectURL(blob));
+			} catch (err) {
+				console.error(err);
+				e.preventDefault();
 			}
-
-			return false;
-		})(name, $rcmSmfFileName.val()));
+		})(name, elemRcmSmfFileName));
 
 		// Header
 		['tempo', 'playBias', 'beatD', 'beatN', 'timeBase'].forEach((key) => {
-			$(`.my-${key}`, $rcmPage).text(rcm.header[key]);
+			elemRcmPage.querySelector(`.my-${key}`).textContent = rcm.header[key];
 		});
 
 		// Key
 		const tonic = ['C', 'G', 'D', 'A', 'E', 'B', 'F#', 'C#', 'C', 'F', 'Bb', 'Eb', 'Ab', 'Db', 'Gb', 'Cb', 'A', 'E', 'B', 'F#', 'C#', 'G#', 'D#', 'A#', 'A', 'D', 'G', 'C', 'F', 'Bb', 'Eb', 'Ab'][rcm.header.key & 0x1f];
-		$('.my-key', $rcmPage).text(`${tonic} ${(rcm.header.key < 0x10) ? 'Major' : 'Minor'}`);
+		elemRcmPage.querySelector('.my-key').textContent = `${tonic} ${(rcm.header.key < 0x10) ? 'Major' : 'Minor'}`;
 
 		// Control files
 		['MTD', 'CM6', 'GSD', 'GSD2'].forEach((key) => {
 			const fileName = `fileName${key}`;
 			if (rcm.header[fileName]) {
-				$(`.my-fileName${key}`, $rcmPage).text(decodeNec932(rcm.header[fileName]));
+				elemRcmPage.querySelector(`.my-fileName${key}`).textContent = decodeNec932(rcm.header[fileName]);
 			}
 		});
 
 		// Memo area
 		if (rcm.header.memoLines && rcm.header.memoLines.length) {
-			$('.my-memoArea', $rcmPage).text(rcm.header.memoLines.map((e) => decodeNec932(e)).join('\n'));
+			elemRcmPage.querySelector('.my-memoArea').textContent = rcm.header.memoLines.map((e) => decodeNec932(e)).join('\n');
 		}
 
 		// User SysEx
 		const table = {0x80: 'gt', 0x81: 've', 0x82: 'ch', 0x83: 'cs', 0x84: 'ss', 0xf7: '<span class="text-muted">f7</span>'};
 		if (rcm.header.userSysExs) {
 			let i = 0;
+			const elemUserSysExs = elemRcmPage.querySelector('.my-userSysExs');
 			for (const userSysEx of rcm.header.userSysExs) {
-				$('.my-userSysExs', $rcmPage).append($(`
+				elemUserSysExs.insertAdjacentHTML('beforeend', `
 					<tr>
 						<th class="text-center align-middle">${i}</th>
 						<td>
-							<h3 class="h6 mb-0">${decodeNec932(userSysEx.memo)}</b></h3>
+							<h3 class="h6 mb-0">${decodeNec932(userSysEx.memo)}</h3>
 							<code>${[...userSysEx.bytes].map((e) => table[e] || e.toString(16).padStart(2, '0')).join(' ')}</code>
 						</td>
-					</tr>`));
+					</tr>`);
 				i++;
 			}
 		}
@@ -703,34 +690,35 @@ $(() => {
 			// Table
 			const trackNo = ('trackNo' in track) ? track.trackNo : trackId;
 			const trackMemo = (track.memo) ? decodeNec932(track.memo) : '';
-			const html = `
-				<td class="text-right">${trackNo}</td>
-				<td class="text-right">${((track.mode & 0x1) === 0) ? 'Play' : 'Mute'}</td>
-				<td class="text-right">${(track.midiCh >= 0) ? track.midiCh + 1 : 'Off'}</td>
-				<td class="text-right">${('stShift' in track) ? track.stShift : 0}</td>
-				<td class="text-right">${(!('keyShift' in track) || (track.keyShift & 0x80) !== 0) ? 0 : track.keyShift - ((track.keyShift >= 0x40) ? 0x80 : 0)}</td>
-				<td style="text-overflow: ellipsis">${trackMemo}</td>`;
-			$('.my-tracks', $rcmPage).append($(`<tr>${html}</tr>`));
+			elemRcmPage.querySelector('.my-tracks').insertAdjacentHTML('beforeend', `
+				<tr>
+					<td class="text-end">${trackNo}</td>
+					<td class="text-end">${((track.mode & 0x1) === 0) ? 'Play' : 'Mute'}</td>
+					<td class="text-end">${(track.midiCh >= 0) ? track.midiCh + 1 : 'Off'}</td>
+					<td class="text-end">${('stShift' in track) ? track.stShift : 0}</td>
+					<td class="text-end">${(!('keyShift' in track) || (track.keyShift & 0x80) !== 0) ? 0 : track.keyShift - ((track.keyShift >= 0x40) ? 0x80 : 0)}</td>
+					<td style="text-overflow: ellipsis">${trackMemo}</td>
+				</tr>`);
 
 			// Tabs
 			const paneId = `my-${id}-pane-${trackId}`;
-			$('.my-trackTabs', $rcmPage).append($(`<a class="nav-link my-0 p-2" href="#${paneId}" role="tab" data-toggle="pill">Tr. ${trackNo}</a>`));
-			$('.my-eventPanes', $rcmPage).append($(`<div id="${paneId}" class="tab-pane" role="tabpanel"></div>`));
-			$(`#${paneId}`, $rcmPage).append($(makeElementFromTemplateId('my-eventTables')));
-			$(`#${paneId} .my-track`, $rcmPage).text(`Track ${trackNo}: ${trackMemo}`);
+			elemRcmPage.querySelector('.my-trackTabs').insertAdjacentHTML('beforeend', `<a class="nav-link my-0 p-2" href="#${paneId}" role="tab" data-bs-toggle="pill">Tr. ${trackNo}</a>`);
+			elemRcmPage.querySelector('.my-eventPanes').insertAdjacentHTML('beforeend', `<div id="${paneId}" class="tab-pane" role="tabpanel"></div>`);
+			elemRcmPage.querySelector(`#${paneId}`).appendChild(makeElementFromTemplateId('my-eventTables'));
+			elemRcmPage.querySelector(`#${paneId} .my-track`).textContent = `Track ${trackNo}: ${trackMemo}`;
 
 			// Events
 			if (kind === 'MCP' && trackId === 0) {
-				$(`#${paneId} .my-events`, $rcmPage).text(makeEventLists('MCP-rhythm', track.events));
+				elemRcmPage.querySelector(`#${paneId} .my-events`).textContent = makeEventLists('MCP-rhythm', track.events);
 			} else {
-				$(`#${paneId} .my-events`, $rcmPage).text(makeEventLists(kind, track.events));
-				$(`#${paneId} .my-extractedEvents`, $rcmPage).text(makeEventLists(`ext-${kind}`, track.extractedEvents));
+				elemRcmPage.querySelector(`#${paneId} .my-events`).textContent = makeEventLists(kind, track.events);
+				elemRcmPage.querySelector(`#${paneId} .my-extractedEvents`).textContent = makeEventLists(`ext-${kind}`, track.extractedEvents);
 			}
 
 			trackId++;
 		}
 
-		return $rcmPage;
+		return elemRcmPage;
 	}
 
 	function makeCtrlPage(sysExs, name) {
@@ -769,53 +757,63 @@ $(() => {
 			[/./u, ''],
 		];
 
-		const $ctrlPage = $(makeElementFromTemplateId('my-ctrlFile'));
+		const elemCtrlPage = document.createElement('div');
+		elemCtrlPage.appendChild(makeElementFromTemplateId('my-ctrlFile'));
 
 		// File name
-		const $ctrlSyxFileName = $('.my-ctrlSyxFileName', $ctrlPage);
-		$ctrlSyxFileName.val(`${name}.syx`);
+		const elemCtrlSyxFileName = elemCtrlPage.querySelector('.my-ctrlSyxFileName');
+		elemCtrlSyxFileName.value = `${name}.syx`;
 
-		const $ctrlSmfFileName = $('.my-ctrlSmfFileName', $ctrlPage);
-		$ctrlSmfFileName.val(`${name}.mid`);
+		const elemCtrlSmfFileName = elemCtrlPage.querySelector('.my-ctrlSmfFileName');
+		elemCtrlSmfFileName.value = `${name}.mid`;
 
 		// Convert
-		$('.my-convertCtrlSyx', $ctrlPage).on('click', ((ctrlFileName, syxFileName) => function() {
+		elemCtrlPage.querySelector('.my-convertCtrlSyx').addEventListener('click', ((ctrlFileName, elemFileName) => function(e) {
 			emptyLogs();
 			try {
 				const bytesIn = contents[ctrlFileName].buf;
 				const sysExs = convertCm6ToSysEx(bytesIn) || convertMtdToSysEx(bytesIn) || convertGsdToSysEx(bytesIn);
-				const bytesOut = new Uint8Array([].concat(...sysExs));
+
+				let totalLength = 0;
+				for (const arr of sysExs) {
+					totalLength += arr.length;
+				}
+				const bytesOut = new Uint8Array(totalLength);
+				let offset = 0;
+				for (const arr of sysExs) {
+					bytesOut.set(arr, offset);
+					offset += arr.length;
+				}
+
 				const blob = new Blob([bytesOut], {type: 'application/octet-stream'});
 
-				$(this).attr('download', syxFileName);
-				$(this).attr('href', URL.createObjectURL(blob));
-			} catch (e) {
-				console.error(e);
+				this.setAttribute('download', elemFileName.value);
+				this.setAttribute('href', URL.createObjectURL(blob));
+			} catch (err) {
+				console.error(err);
+				e.preventDefault();
 			}
+		})(name, elemCtrlSyxFileName));
 
-			return true;
-		})(name, $ctrlSyxFileName.val()));
-
-		$('.my-convertCtrlSmf', $ctrlPage).on('click', ((ctrlFileName, smfFileName) => function() {
+		elemCtrlPage.querySelector('.my-convertCtrlSmf').addEventListener('click', ((ctrlFileName, elemFileName) => function(e) {
 			emptyLogs();
 			try {
 				const smf = ctrl2smf(contents[ctrlFileName].buf, ctrlFileName, currentSettings);
 				const blob = new Blob([smf], {type: 'audio/midi'});
 
-				$(this).attr('download', smfFileName);
-				$(this).attr('href', URL.createObjectURL(blob));
-			} catch (e) {
-				console.error(e);
+				this.setAttribute('download', elemFileName.value);
+				this.setAttribute('href', URL.createObjectURL(blob));
+			} catch (err) {
+				console.error(err);
+				e.preventDefault();
 			}
-
-			return true;
-		})(name, $ctrlSmfFileName.val()));
+		})(name, elemCtrlSmfFileName));
 
 		// SysExs
 		for (const sysEx of sysExs) {
 			const hexStr = [...sysEx].map((e) => e.toString(16).padStart(2, '0')).join(' ');
 			const addrStr = tableAddr.filter((e) => e[0].test(hexStr))[0][1];
-			let timbreHtml;
+			let timbreHtml = '';
 			if (/^f0 41 10 16 12 08 [0-7][02468ace] 00/u.test(hexStr)) {
 				const timbreNo = sysEx[6] / 2;
 				console.assert(Number.isInteger(timbreNo) && (0 <= timbreNo && timbreNo < 64));
@@ -828,19 +826,19 @@ $(() => {
 					</div>`;
 			}
 			const isRedundant = isSysExRedundant(sysEx);
-			$('.my-sysExs', $ctrlPage).append($(`
+			elemCtrlPage.querySelector('.my-sysExs').insertAdjacentHTML('beforeend', `
 				<tr class="${(isRedundant) ? 'table-secondary text-muted' : ''}">
 					<th style="width: 15rem;">
 						${addrStr}
-						${(timbreHtml) ? timbreHtml : ''}
+						${timbreHtml}
 					</th>
 					<td>
 						<pre class="my-sysEx mb-0"><code>${hexStr}</code></pre>
 					</td>
-				</tr>`));
+				</tr>`);
 		}
 
-		return $ctrlPage;
+		return elemCtrlPage;
 	}
 
 	// Handles D&D related events.
@@ -863,16 +861,19 @@ $(() => {
 			}
 
 			// Moves to the newest pane.
-			$('#my-fileTabs a.nav-link:last').tab('show');
+			const tabs = document.querySelectorAll('#my-fileTabs a.nav-link');
+			if (tabs.length > 0) {
+				(new bootstrap.Tab(tabs[tabs.length - 1])).show();
+			}
 		})();
 	});
 
 	// Adds "Help" pane.
-	$('#my-fileTabs').append($('<li class="nav-item"><a id="my-tab-help" class="nav-link" href="#my-pane-help" role="tab" data-toggle="tab">Help</a></li>'));
-	$('#my-filePanes').append($('<div id="my-pane-help" class="tab-pane fade" role="tabpanel"></div>'));
-	$('#my-pane-help').append($(makeElementFromTemplateId('my-help')));
-	$('#my-pane-help .my-helpText').append(marked(document.getElementById('my-markdown').content.textContent, {headerIds: false}));
-	$('#my-tab-help').tab('show');
+	document.getElementById('my-fileTabs').insertAdjacentHTML('beforeend', '<li class="nav-item"><a id="my-tab-help" class="nav-link" href="#my-pane-help" role="tab" data-bs-toggle="tab">Help</a></li>');
+	document.getElementById('my-filePanes').insertAdjacentHTML('beforeend','<div id="my-pane-help" class="tab-pane fade" role="tabpanel"></div>');
+	document.getElementById('my-pane-help').appendChild(makeElementFromTemplateId('my-help'));
+	document.querySelector('#my-pane-help .my-helpText').innerHTML = marked(document.getElementById('my-markdown').content.textContent, {headerIds: false});
+	(new bootstrap.Tab(document.getElementById('my-tab-help'))).show();
 
 	/* eslint-enable no-invalid-this */
 });
@@ -918,14 +919,14 @@ th {
 			<h1 class="h6 mb-0"><span class="navbar-brand">rcm2smf</span></h1>
 			<div class="row justify-content-center flex-fill">
 				<div class="col-xl-8 col-lg-10 col-12">
-					<a class="btn btn-outline-secondary float-right ml-2 px-2 py-0" href="#my-logs" role="button" data-toggle="collapse">&hellip;</a>
+					<a class="btn btn-outline-secondary float-end ms-2 px-2 py-0" href="#my-logs" role="button" data-bs-toggle="collapse">&hellip;</a>
 					<div class="alert alert-light mb-0 py-2" role="alert" style="max-height: 10rem; overflow-y: auto;">
 						<div id="my-log">Log messages will be displayed.</div>
 						<ul id="my-logs" class="collapse list-unstyled border-top mb-0"></ul>
 					</div>
 				</div>
 			</div>
-			<button type="button" class="btn btn-secondary" data-toggle="modal" data-target="#my-settingsModal">Settings</button>
+			<button type="button" class="btn btn-secondary" data-bs-toggle="modal" data-bs-target="#my-settingsModal">Settings</button>
 		</div>
 	</nav>
 
@@ -943,14 +944,14 @@ th {
 			<div class="modal-content">
 				<div class="modal-header">
 					<h2 class="modal-title h6">Settings</h2>
-					<button type="button" class="close" data-dismiss="modal">&times;</button>
+					<button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
 				</div>
 				<div class="modal-body">
 					<div class="container-fluid">
 						<form>
 							<h3 class="h6 mb-3">SMF Generation:</h3>
-							<div class="form-group row">
-								<div class="col-2 float-left" style="height: 0;">Meta Event</div>
+							<div class="row mb-3">
+								<div class="col-2 float-start" style="height: 0;">Meta Event</div>
 								<div class="col-10">
 									<div class="form-check">
 										<input id="my-metaTextMemo" type="checkbox" class="form-check-input">
@@ -960,7 +961,7 @@ th {
 									</div>
 								</div>
 							</div>
-							<div class="form-group row">
+							<div class="row mb-3">
 								<div class="offset-2 col-10">
 									<div class="form-check">
 										<input id="my-metaTextComment" type="checkbox" class="form-check-input">
@@ -970,7 +971,7 @@ th {
 									</div>
 								</div>
 							</div>
-							<div class="form-group row">
+							<div class="row mb-3">
 								<div class="offset-2 col-10">
 									<div class="form-check">
 										<input id="my-metaTextUsrExc" type="checkbox" class="form-check-input">
@@ -980,7 +981,7 @@ th {
 									</div>
 								</div>
 							</div>
-							<div class="form-group row">
+							<div class="row mb-3">
 								<div class="offset-2 col-10">
 									<div class="form-check">
 										<input id="my-metaCue" type="checkbox" class="form-check-input">
@@ -990,7 +991,7 @@ th {
 									</div>
 								</div>
 							</div>
-							<div class="form-group row">
+							<div class="row mb-3">
 								<div class="offset-2 col-10">
 									<div class="form-check">
 										<input id="my-metaTimeSignature" type="checkbox" class="form-check-input">
@@ -1000,47 +1001,47 @@ th {
 									</div>
 								</div>
 							</div>
-							<div class="form-group row">
-								<div class="col-2 float-left" style="height: 0;">Trimming</div>
+							<div class="row mb-3">
+								<div class="col-2 float-start" style="height: 0;">Trimming</div>
 								<div class="col-8">Remove whitespace from SMF Sequence/Track Name event</div>
-								<select class="custom-select col-2" id="my-trimTrackName">
+								<select class="form-select col-2" id="my-trimTrackName">
 									<option value="none">None</option>
 									<option value="left">Left</option>
 									<option value="right">Right</option>
 									<option value="both">Both</option>
 								</select>
 							</div>
-							<div class="form-group row">
+							<div class="row mb-3">
 								<div class="offset-2 col-8">Remove whitespace from SMF Text events for RCM memo area</div>
-								<select class="custom-select col-2" id="my-trimTextMemo">
+								<select class="form-select col-2" id="my-trimTextMemo">
 									<option value="none">None</option>
 									<option value="left">Left</option>
 									<option value="right">Right</option>
 									<option value="both">Both</option>
 								</select>
 							</div>
-							<div class="form-group row">
+							<div class="row mb-3">
 								<div class="offset-2 col-8">Remove whitespace from SMF Text events for RCM Comment events
 								</div>
-								<select class="custom-select col-2" id="my-trimTextComment">
+								<select class="form-select col-2" id="my-trimTextComment">
 									<option value="none">None</option>
 									<option value="left">Left</option>
 									<option value="right">Right</option>
 									<option value="both">Both</option>
 								</select>
 							</div>
-							<div class="form-group row">
+							<div class="row mb-3">
 								<div class="offset-2 col-8">Remove whitespace from SMF Text events for RCM UsrExc events
 								</div>
-								<select class="custom-select col-2" id="my-trimTextUsrExc">
+								<select class="form-select col-2" id="my-trimTextUsrExc">
 									<option value="none">None</option>
 									<option value="left">Left</option>
 									<option value="right">Right</option>
 									<option value="both">Both</option>
 								</select>
 							</div>
-							<div class="form-group row">
-								<div class="col-2 float-left" style="height: 0;">Note Off</div>
+							<div class="row mb-3">
+								<div class="col-2 float-start" style="height: 0;">Note Off</div>
 								<div class="col-10">
 									<div class="form-check">
 										<input id="my-noteOff" type="checkbox" class="form-check-input">
@@ -1051,23 +1052,23 @@ th {
 									</div>
 								</div>
 							</div>
-							<div class="form-group row">
-								<div class="offset-2 col-8">Velocity of note-off ("<code>8nH kk uu</code>") events</div>
-								<input id="my-noteOffVel" type="number" class="form-control col-2" min="0" max="127" placeholder="Velocity">
+							<div class="row mb-3">
+								<div class="offset-2 col-8 align-self-center">Velocity of note-off ("<code>8nH kk uu</code>") events</div>
+								<div class="col-2"><input id="my-noteOffVel" type="number" class="form-control" min="0" max="127" placeholder="Velocity"></div>
 							</div>
-	
+
 							<h3 class="h6 mb-3">RCM Parsing:</h3>
-							<div class="form-group row">
-								<div class="col-2 float-left" style="height: 0;">ST+</div>
+							<div class="row mb-3">
+								<div class="col-2 float-start" style="height: 0;">ST+</div>
 								<div class="col-8">Assume ST+ as signed (&ge; RCM 2.5) or unsigned (&le; RCM 2.3a)</div>
-								<select class="custom-select col-2" id="my-stPlus">
+								<select class="form-select col-2" id="my-stPlus">
 									<option value="auto">Auto</option>
 									<option value="unsigned">Unsigned</option>
 									<option value="signed">Signed</option>
 								</select>
 							</div>
-							<div class="form-group row">
-								<div class="col-2 float-left" style="height: 0;">Control File</div>
+							<div class="row mb-3">
+								<div class="col-2 float-start" style="height: 0;">Control File</div>
 								<div class="col-10">
 									<div class="form-check">
 										<input id="my-resetBeforeCtrl" type="checkbox" class="form-check-input">
@@ -1077,7 +1078,7 @@ th {
 									</div>
 								</div>
 							</div>
-							<div class="form-group row">
+							<div class="row mb-3">
 								<div class="offset-2 col-10">
 									<div class="form-check">
 										<input id="my-optimizeCtrl" type="checkbox" class="form-check-input">
@@ -1087,7 +1088,7 @@ th {
 									</div>
 								</div>
 							</div>
-							<div class="form-group row">
+							<div class="row mb-3">
 								<div class="offset-2 col-10">
 									<div class="form-check">
 										<input id="my-extraSysexWait" type="checkbox" class="form-check-input">
@@ -1097,7 +1098,7 @@ th {
 									</div>
 								</div>
 							</div>
-							<div class="form-group row">
+							<div class="row mb-3">
 								<div class="offset-2 col-10">
 									<div class="form-check">
 										<input id="my-ignoreCtrlFile" type="checkbox" class="form-check-input">
@@ -1107,8 +1108,8 @@ th {
 									</div>
 								</div>
 							</div>
-							<div class="form-group row">
-								<div class="col-2 float-left" style="height: 0;">Error handling</div>
+							<div class="row mb-3">
+								<div class="col-2 float-start" style="height: 0;">Error handling</div>
 								<div class="col-10">
 									<div class="form-check">
 										<input id="my-ignoreOutOfRange" type="checkbox" class="form-check-input">
@@ -1118,7 +1119,7 @@ th {
 									</div>
 								</div>
 							</div>
-							<div class="form-group row">
+							<div class="row mb-3">
 								<div class="offset-2 col-10">
 									<div class="form-check">
 										<input id="my-ignoreWrongEvent" type="checkbox" class="form-check-input">
@@ -1128,53 +1129,53 @@ th {
 									</div>
 								</div>
 							</div>
-							<div class="form-group row">
-								<div class="col-2 float-left" style="height: 0;">Loop handling</div>
-								<div class="col-8">Maximum loop nest level</div>
-								<input id="my-maxLoopNest" type="number" class="form-control col-2" min="0" max="100" placeholder="Loop level">
+							<div class="row mb-3">
+								<div class="col-2 float-start" style="height: 0;">Loop handling</div>
+								<div class="col-8 align-self-center">Maximum loop nest level</div>
+								<div class="col-2"><input id="my-maxLoopNest" type="number" class="form-control" min="0" max="100" placeholder="Loop level"></div>
 							</div>
-							<div class="form-group row">
-								<div class="offset-2 col-8">Loop count to revise to avoid loop-bomb</div>
-								<input id="my-infinityLoopCount" type="number" class="form-control col-2" min="1" max="255" placeholder="Loop count">
+							<div class="row mb-3">
+								<div class="offset-2 col-8 align-self-center">Loop count to revise to avoid loop-bomb</div>
+								<div class="col-2"><input id="my-infinityLoopCount" type="number" class="form-control" min="1" max="255" placeholder="Loop count"></div>
 							</div>
-							<div class="form-group row">
-								<div class="offset-2 col-8">Number of extracted beats considered as loop-bomb</div>
-								<input id="my-loopBombThreshold" type="number" class="form-control col-2" min="100" placeholder="Beats">
+							<div class="row mb-3">
+								<div class="offset-2 col-8 align-self-center">Number of extracted beats considered as loop-bomb</div>
+								<div class="col-2"><input id="my-loopBombThreshold" type="number" class="form-control" min="100" placeholder="Beats"></div>
 							</div>
-							<div class="form-group row">
-								<div class="col-2 float-left" style="height: 0;">RolPara</div>
-								<div class="col-8">Initial value of device ID for <code>RolDev#</code></div>
-								<input id="my-rolandDevId" type="number" class="form-control col-2" min="0" max="127" placeholder="Device ID">
+							<div class="row mb-3">
+								<div class="col-2 float-start" style="height: 0;">RolPara</div>
+								<div class="col-8 align-self-center">Initial value of device ID for <code>RolDev#</code></div>
+								<div class="col-2"><input id="my-rolandDevId" type="number" class="form-control" min="0" max="127" placeholder="Device ID"></div>
 							</div>
-							<div class="form-group row">
-								<div class="offset-2 col-8">Initial value of model ID for <code>RolDev#</code></div>
-								<input id="my-rolandModelId" type="number" class="form-control col-2" min="0" max="127" placeholder="Model ID">
+							<div class="row mb-3">
+								<div class="offset-2 col-8 align-self-center">Initial value of model ID for <code>RolDev#</code></div>
+								<div class="col-2"><input id="my-rolandModelId" type="number" class="form-control" min="0" max="127" placeholder="Model ID"></div>
 							</div>
-							<div class="form-group row">
-								<div class="offset-2 col-6">Initial value of the base address for <code>RolBase</code></div>
-								<input id="my-rolandBaseAddrH" type="number" class="form-control col-2" min="0" max="127" placeholder="Address (H)">
-								<input id="my-rolandBaseAddrM" type="number" class="form-control col-2" min="0" max="127" placeholder="Address (M)">
+							<div class="row mb-3">
+								<div class="offset-2 col-6 align-self-center">Initial value of the base address for <code>RolBase</code></div>
+								<div class="col-2"><input id="my-rolandBaseAddrH" type="number" class="form-control" min="0" max="127" placeholder="Address (H)"></div>
+								<div class="col-2"><input id="my-rolandBaseAddrM" type="number" class="form-control" min="0" max="127" placeholder="Address (M)"></div>
 							</div>
-							<div class="form-group row">
-								<div class="col-2 float-left" style="height: 0;">XGPara &amp; YamPara</div>
-								<div class="col-8">Initial value of device ID for <code>YamDev#</code></div>
-								<input id="my-yamahaDevId" type="number" class="form-control col-2" min="0" max="127" placeholder="Device ID">
+							<div class="row mb-3">
+								<div class="col-2 float-start" style="height: 0;">XGPara &amp; YamPara</div>
+								<div class="col-8 align-self-center">Initial value of device ID for <code>YamDev#</code></div>
+								<div class="col-2"><input id="my-yamahaDevId" type="number" class="form-control" min="0" max="127" placeholder="Device ID"></div>
 							</div>
-							<div class="form-group row">
-								<div class="offset-2 col-8">Initial value of model ID for <code>YamDev#</code></div>
-								<input id="my-yamahaModelId" type="number" class="form-control col-2" min="0" max="127" placeholder="Model ID">
+							<div class="row mb-3">
+								<div class="offset-2 col-8 align-self-center">Initial value of model ID for <code>YamDev#</code></div>
+								<div class="col-2"><input id="my-yamahaModelId" type="number" class="form-control" min="0" max="127" placeholder="Model ID"></div>
 							</div>
-							<div class="form-group row">
-								<div class="offset-2 col-6">Initial value of the base address for <code>YamBase</code></div>
-								<input id="my-yamahaBaseAddrH" type="number" class="form-control col-2" min="0" max="127" placeholder="Address (H)">
-								<input id="my-yamahaBaseAddrM" type="number" class="form-control col-2" min="0" max="127" placeholder="Address (M)">
+							<div class="row mb-3">
+								<div class="offset-2 col-6 align-self-center">Initial value of the base address for <code>YamBase</code></div>
+								<div class="col-2"><input id="my-yamahaBaseAddrH" type="number" class="form-control" min="0" max="127" placeholder="Address (H)"></div>
+								<div class="col-2"><input id="my-yamahaBaseAddrM" type="number" class="form-control" min="0" max="127" placeholder="Address (M)"></div>
 							</div>
 						</form>
 					</div>
 				</div>
 				<div class="modal-footer">
-					<button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
-					<button id="my-saveChanges" type="button" class="btn btn-primary" data-dismiss="modal">Save changes</button>
+					<button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+					<button id="my-saveChanges" type="button" class="btn btn-primary" data-bs-dismiss="modal">Save changes</button>
 				</div>
 			</div>
 		</div>
@@ -1186,7 +1187,7 @@ th {
 			<div class="modal-content">
 				<div class="modal-header">
 					<h2 class="modal-title h6">Error</h2>
-					<button type="button" class="close" data-dismiss="modal">&times;</button>
+					<button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
 				</div>
 				<div class="modal-body">
 					<ul id="my-errors" class="list-unstyled"></ul>
@@ -1204,13 +1205,9 @@ th {
 			</div>
 			<div class="col-xl-4 col-lg-6 d-flex justify-content-end">
 				<div class="input-group mr-2">
-					<div class="input-group-prepend">
-						<div class="input-group-text">SMF Name</div>
-					</div>
+					<span class="input-group-text">SMF Name</span>
 					<input type="text" class="my-rcmSmfFileName form-control" placeholder="SMF File Name">
-					<div class="input-group-append">
-						<a class="my-convertRcm btn btn-primary" href="#" role="button">Convert</a>
-					</div>
+					<a class="my-convertRcm btn btn-primary" href="#" role="button">Convert</a>
 				</div>
 			</div>
 		</div>
@@ -1218,22 +1215,22 @@ th {
 			<div class="col-xl-5 col-lg-12">
 				<div class="row mt-3">
 					<!-- Header information -->
-					<div class="col-xl-5 col-lg-6 pr-xl-0">
+					<div class="col-xl-5 col-lg-6 pe-xl-0">
 						<div class="card">
 							<h3 class="card-header h6">Header</h3>
 							<div class="card-body">
 								<table class="table table-borderless table-sm m-0">
 									<tbody>
-										<tr><th class="pl-0">Tempo:</th><td class="my-tempo text-right"></td></tr>
-										<tr><th class="pl-0">Play Bias:</th><td class="my-playBias text-right"></td></tr>
-										<tr><th class="pl-0">Key:</th><td class="my-key text-right"></td></tr>
-										<tr><th class="pl-0">Beat:</th><td class="text-right"><span class="my-beatN"></span> / <span class="my-beatD"></span></td></tr>
-										<tr><th class="pl-0">Time Base:</th><td class="my-timeBase text-right"></td></tr>
+										<tr><th class="pl-0">Tempo:</th><td class="my-tempo text-end"></td></tr>
+										<tr><th class="pl-0">Play Bias:</th><td class="my-playBias text-end"></td></tr>
+										<tr><th class="pl-0">Key:</th><td class="my-key text-end"></td></tr>
+										<tr><th class="pl-0">Beat:</th><td class="text-end"><span class="my-beatN"></span> / <span class="my-beatD"></span></td></tr>
+										<tr><th class="pl-0">Time Base:</th><td class="my-timeBase text-end"></td></tr>
 									</tbody>
 								</table>
 								<hr class="">
 								<h4 class="h6">Control File(s):</h4>
-								<ul class="list-unstyled mb-0 text-right">
+								<ul class="list-unstyled mb-0 text-end">
 									<li class="my-fileNameMTD"></li>
 									<li class="my-fileNameCM6"></li>
 									<li class="my-fileNameGSD"></li>
@@ -1261,11 +1258,11 @@ th {
 								<table class="table table-sm m-0">
 									<thead>
 										<tr>
-											<th class="text-right" style="width: 2.5rem;">Tr.</th>
-											<th class="text-right" style="width: 2.5rem;">Mode</th>
-											<th class="text-right" style="width: 2.5rem;">Ch.</th>
-											<th class="text-right" style="width: 2.5rem;">ST+</th>
-											<th class="text-right" style="width: 2.5rem;">K#+</th>
+											<th class="text-end" style="width: 2.5rem;">Tr.</th>
+											<th class="text-end" style="width: 2.5rem;">Mode</th>
+											<th class="text-end" style="width: 2.5rem;">Ch.</th>
+											<th class="text-end" style="width: 2.5rem;">ST+</th>
+											<th class="text-end" style="width: 2.5rem;">K#+</th>
 											<th>Memo</th>
 										</tr>
 									</thead>
@@ -1285,7 +1282,7 @@ th {
 								<table class="table table-sm m-0">
 									<thead>
 										<tr>
-											<th class="text-right" style="width: 3rem;">No.</th>
+											<th class="text-end" style="width: 3rem;">No.</th>
 											<th>Memo &amp; Content</th>
 										</tr>
 									</thead>
@@ -1299,7 +1296,7 @@ th {
 			</div>
 			<div class="col-xl-7 col-lg-12">
 				<div class="row mt-3">
-					<div class="col-11 pr-2">
+					<div class="col-11 pe-2">
 						<div class="card">
 							<h3 class="card-header h6">Events</h3>
 							<div class="card-body">
@@ -1316,7 +1313,7 @@ th {
 					</div>
 				</div>
 			</div>
-		</div>			
+		</div>
 	</template>
 
 	<!-- Template for event table -->
@@ -1328,12 +1325,12 @@ th {
 			</div>
 		</div>
 		<div class="row" style="display: flex;">
-			<div class="col p-0" style="min-width: 22,5rem; max-width: 22.5rem;">
-				<h4 class="h6 pl-3">Original:</h4>
+			<div class="col p-0" style="min-width: 22.5rem; max-width: 22.5rem;">
+				<h4 class="h6 ps-3">Original:</h4>
 				<pre class="my-events"></pre>
 			</div>
 			<div class="col p-0" style="flex: 1;">
-				<h4 class="h6 pl-3">Extracted:</h4>
+				<h4 class="h6 ps-3">Extracted:</h4>
 				<pre class="my-extractedEvents"></pre>
 			</div>
 		</div>
@@ -1347,24 +1344,16 @@ th {
 			</div>
 			<div class="col-xl-4 col-lg-6 d-flex justify-content-end">
 				<div class="input-group mr-2">
-					<div class="input-group-prepend">
-						<div class="input-group-text">Syx Name</div>
-					</div>
+					<span class="input-group-text">Syx Name</span>
 					<input type="text" class="my-ctrlSyxFileName form-control" placeholder="Syx File Name">
-					<div class="input-group-append">
-						<a class="my-convertCtrlSyx btn btn-primary" href="#" role="button">Convert</a>
-					</div>
+					<a class="my-convertCtrlSyx btn btn-primary" href="#" role="button">Convert</a>
 				</div>
 			</div>
 			<div class="col-xl-4 col-lg-6 d-flex justify-content-end">
 				<div class="input-group mr-2">
-					<div class="input-group-prepend">
-						<div class="input-group-text">SMF Name</div>
-					</div>
+					<span class="input-group-text">SMF Name</span>
 					<input type="text" class="my-ctrlSmfFileName form-control" placeholder="SMF File Name">
-					<div class="input-group-append">
-						<a class="my-convertCtrlSmf btn btn-primary" href="#" role="button">Convert</a>
-					</div>
+					<a class="my-convertCtrlSmf btn btn-primary" href="#" role="button">Convert</a>
 				</div>
 			</div>
 		</div>
@@ -1442,7 +1431,7 @@ Some Recomposer sequence files contain "control files" to set up the initial set
 	* For RCP/R36/G36 files
 	* Intended to Roland SC-55.
 	* As for G36, two GSD files can be used for each port.
-</template>
+	</template>
 
 </body>
 </html>
