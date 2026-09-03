@@ -1004,41 +1004,47 @@ th {
 							<div class="row mb-3">
 								<div class="col-2 float-start" style="height: 0;">Trimming</div>
 								<div class="col-8">Remove whitespace from SMF Sequence/Track Name event</div>
-								<select class="form-select col-2" id="my-trimTrackName">
-									<option value="none">None</option>
-									<option value="left">Left</option>
-									<option value="right">Right</option>
-									<option value="both">Both</option>
-								</select>
+								<div class="col-2">
+									<select class="form-select" id="my-trimTrackName">
+										<option value="none">None</option>
+										<option value="left">Left</option>
+										<option value="right">Right</option>
+										<option value="both">Both</option>
+									</select>
+								</div>
 							</div>
 							<div class="row mb-3">
 								<div class="offset-2 col-8">Remove whitespace from SMF Text events for RCM memo area</div>
-								<select class="form-select col-2" id="my-trimTextMemo">
-									<option value="none">None</option>
-									<option value="left">Left</option>
-									<option value="right">Right</option>
-									<option value="both">Both</option>
-								</select>
+								<div class="col-2">
+									<select class="form-select" id="my-trimTextMemo">
+										<option value="none">None</option>
+										<option value="left">Left</option>
+										<option value="right">Right</option>
+										<option value="both">Both</option>
+									</select>
+								</div>
 							</div>
 							<div class="row mb-3">
-								<div class="offset-2 col-8">Remove whitespace from SMF Text events for RCM Comment events
+								<div class="offset-2 col-8">Remove whitespace from SMF Text events for RCM Comment events</div>
+								<div class="col-2">
+									<select class="form-select" id="my-trimTextComment">
+										<option value="none">None</option>
+										<option value="left">Left</option>
+										<option value="right">Right</option>
+										<option value="both">Both</option>
+									</select>
 								</div>
-								<select class="form-select col-2" id="my-trimTextComment">
-									<option value="none">None</option>
-									<option value="left">Left</option>
-									<option value="right">Right</option>
-									<option value="both">Both</option>
-								</select>
 							</div>
 							<div class="row mb-3">
-								<div class="offset-2 col-8">Remove whitespace from SMF Text events for RCM UsrExc events
+								<div class="offset-2 col-8">Remove whitespace from SMF Text events for RCM UsrExc events</div>
+								<div class="col-2">
+									<select class="form-select" id="my-trimTextUsrExc">
+										<option value="none">None</option>
+										<option value="left">Left</option>
+										<option value="right">Right</option>
+										<option value="both">Both</option>
+									</select>
 								</div>
-								<select class="form-select col-2" id="my-trimTextUsrExc">
-									<option value="none">None</option>
-									<option value="left">Left</option>
-									<option value="right">Right</option>
-									<option value="both">Both</option>
-								</select>
 							</div>
 							<div class="row mb-3">
 								<div class="col-2 float-start" style="height: 0;">Note Off</div>
@@ -1061,11 +1067,13 @@ th {
 							<div class="row mb-3">
 								<div class="col-2 float-start" style="height: 0;">ST+</div>
 								<div class="col-8">Assume ST+ as signed (&ge; RCM 2.5) or unsigned (&le; RCM 2.3a)</div>
-								<select class="form-select col-2" id="my-stPlus">
-									<option value="auto">Auto</option>
-									<option value="unsigned">Unsigned</option>
-									<option value="signed">Signed</option>
-								</select>
+								<div class="col-2">
+									<select class="form-select" id="my-stPlus">
+										<option value="auto">Auto</option>
+										<option value="unsigned">Unsigned</option>
+										<option value="signed">Signed</option>
+									</select>
+								</div>
 							</div>
 							<div class="row mb-3">
 								<div class="col-2 float-start" style="height: 0;">Control File</div>
