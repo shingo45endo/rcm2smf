@@ -1514,7 +1514,10 @@ export function convertRcmToSeq(rcm, options) {
 
 				case EVENT.TEMPO:
 					if (validateRange((gt > 0), `Invalid tempo rate: ${gt}`)) {	// Note: It can be greater than 255 in G36.
-						tempoEventMap.set(timestamp, event);
+						if (timestamp < 0) {
+							console.warn(`A tempo event appeared previous to the zero point due to ST+. Adjusted it to zero: (${timestamp} -> 0)`);
+						}
+						tempoEventMap.set(Math.max(timestamp, 0), event);
 					}
 					break;
 
