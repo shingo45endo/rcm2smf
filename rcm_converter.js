@@ -348,7 +348,7 @@ export function parseMcp(buf) {
 	rcm.header.tempo    = view.getUint8(0x21);
 	rcm.header.beatN    = view.getUint8(0x22);
 	rcm.header.beatD    = view.getUint8(0x23);
-	rcm.header.key      = view.getUint8(0x24);
+	rcm.header.key      = convertKeyMcpToRcp(view.getUint8(0x24));
 
 	if (buf[0x60] !== 0x00 && buf[0x60] !== 0x20) {
 		rcm.header.fileNameMTD = new Uint8Array([...rawTrim(rawTrimNul(buf.slice(0x60, 0x66))), '.'.codePointAt(), ...rawTrim(rawTrimNul(buf.slice(0x66, 0x69)))]);
@@ -391,6 +391,21 @@ export function parseMcp(buf) {
 	}
 
 	return rcm;
+
+	function convertKeyMcpToRcp(keyMcp) {
+		// MCP numbers keys as 0-11: C-B major, 12-23: Am-G#m, and 24-29: enharmonic keys.
+		// (The same table as CV.EXE, an official MCP to RCP converter)
+		const keysRcp = [
+			0x00, 0x0d, 0x02, 0x0b, 0x04, 0x09, 0x06, 0x01, 0x0c, 0x03, 0x0a, 0x05,
+			0x10, 0x1d, 0x12, 0x1b, 0x14, 0x19, 0x1e, 0x11, 0x1c, 0x13, 0x1a, 0x15,
+			0x07, 0x0e, 0x1f, 0x17, 0x16, 0x0f,
+		];
+		if (keyMcp >= keysRcp.length) {
+			console.warn(`Invalid key of MCP: ${keyMcp}. Changed to C major.`);
+			return 0x00;
+		}
+		return keysRcp[keyMcp];
+	}
 }
 
 export function parseRcp(buf) {
