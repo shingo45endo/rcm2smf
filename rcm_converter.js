@@ -1082,6 +1082,10 @@ export function convertRcmToSeq(rcm, options) {
 	const makeNoteOff = (settings.noteOff) ? (chNo, noteNo) => makeMidiEvent(0x8, chNo, noteNo, settings.noteOffVel) : (chNo, noteNo) => makeMidiEvent(0x9, chNo, noteNo, 0);
 
 	const validateRange = (settings.ignoreOutOfRange) ? (isValid, message) => validateAndIgnore(isValid, message) : (isValid, message) => validateAndThrow(isValid, message);
+	const maskValues = (settings.ignoreOutOfRange) ? (values, message) => maskAndWarn(values, message) : (values, message) => {
+		validateAndThrow(isIn7bitRange(...values), message);
+		return values;
+	};
 	const throwOrIgnore = (settings.ignoreWrongEvent) ? (message) => validateAndIgnore(false, message) : (message) => validateAndThrow(false, message);
 
 	// SMF-related variables
@@ -1281,12 +1285,14 @@ export function convertRcmToSeq(rcm, options) {
 			if (cmd < 0x80) {
 				// Note event
 				if (chNo >= 0 && gt > 0 && vel > 0) {
-					if (validateRange(isIn7bitRange(vel), `Invalid note-on event: [${hexStr(event)}]`)) {
+					const [velocity] = maskValues([vel], `Invalid note-on event: [${hexStr(event)}]`);
+					// If the velocity becomes 0 as a result of masking, do not trigger a note-on.
+					if (velocity > 0) {
 						const noteNo = cmd + keyShift;
 						if (0 <= noteNo && noteNo < 0x80) {
 							// Note on or tie
 							if (noteGts[noteNo] < 0) {
-								setEvent(smfTrack, timestamp, makeMidiEvent(0x9, chNo, noteNo, vel));
+								setEvent(smfTrack, timestamp, makeMidiEvent(0x9, chNo, noteNo, velocity));
 							}
 							noteGts[noteNo] = gt;
 						} else {
@@ -1301,30 +1307,26 @@ export function convertRcmToSeq(rcm, options) {
 				// MIDI messages
 				case EVENT.CONTROL:
 					if (chNo >= 0) {
-						if (validateRange(isIn7bitRange(gt, vel), `Invalid CONTROL event: [${hexStr(event)}]`)) {
-							setEvent(smfTrack, timestamp, makeMidiEvent(0xb, chNo, gt, vel));
-						}
+						const [ctrlNo, value] = maskValues([gt, vel], `Invalid CONTROL event: [${hexStr(event)}]`);
+						setEvent(smfTrack, timestamp, makeMidiEvent(0xb, chNo, ctrlNo, value));
 					}
 					break;
 				case EVENT.PITCH:
 					if (chNo >= 0) {
-						if (validateRange(isIn7bitRange(gt, vel), `Invalid PITCH event: [${hexStr(event)}]`)) {
-							setEvent(smfTrack, timestamp, makeMidiEvent(0xe, chNo, gt, vel));
-						}
+						const [lsb, msb] = maskValues([gt, vel], `Invalid PITCH event: [${hexStr(event)}]`);
+						setEvent(smfTrack, timestamp, makeMidiEvent(0xe, chNo, lsb, msb));
 					}
 					break;
 				case EVENT.AFTER_C:
 					if (chNo >= 0) {
-						if (validateRange(isIn7bitRange(gt), `Invalid AFTER C. event: [${hexStr(event)}]`)) {
-							setEvent(smfTrack, timestamp, makeMidiEvent(0xd, chNo, gt));
-						}
+						const [value] = maskValues([gt], `Invalid AFTER C. event: [${hexStr(event)}]`);
+						setEvent(smfTrack, timestamp, makeMidiEvent(0xd, chNo, value));
 					}
 					break;
 				case EVENT.AFTER_K:
 					if (chNo >= 0) {
-						if (validateRange(isIn7bitRange(gt, vel), `Invalid AFTER K. event: [${hexStr(event)}]`)) {
-							setEvent(smfTrack, timestamp, makeMidiEvent(0xa, chNo, gt, vel));
-						}
+						const [noteNo, value] = maskValues([gt, vel], `Invalid AFTER K. event: [${hexStr(event)}]`);
+						setEvent(smfTrack, timestamp, makeMidiEvent(0xa, chNo, noteNo, value));
 					}
 					break;
 				case EVENT.PROGRAM:
@@ -2002,6 +2004,13 @@ function validateAndIgnore(isValid, message) {
 		console.warn(`${message} Ignored.`);
 	}
 	return isValid;
+}
+
+function maskAndWarn(values, message) {
+	if (!isIn7bitRange(...values)) {
+		console.warn(`${message} Masked to 7 bits.`);
+	}
+	return values.map((e) => e & 0x7f);
 }
 
 function nop() {
