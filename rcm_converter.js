@@ -1616,7 +1616,10 @@ export function convertRcmToSeq(rcm, options) {
 
 				default:
 					throwOrIgnore(`Unknown event: [${hexStr(event)}]`);
-					st = 0;
+					// Events below 0xf0 have step time even if they are unknown.
+					if (cmd >= 0xf0) {
+						st = 0;
+					}
 					break;
 				}
 			}
