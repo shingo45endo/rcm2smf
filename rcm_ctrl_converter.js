@@ -194,8 +194,15 @@ export function convertGsdToSysEx(buf) {
 		console.assert(nibbles.length === 4, {nibbles});
 
 		// [4-7] Rx. parameters
-		nibbles.push(...bytes.slice(0x03, 0x13).reduce((p, c, i) => {
-			const bit = c & 0x01;
+		// Offsets of the Rx. switches from the MSB of nibble 4. They are not in the order of the GSD.
+		const rxOffsets = [
+			0x0a, 0x03, 0x04, 0x05,
+			0x06, 0x07, 0x08, 0x12,
+			0x11, 0x10, 0x0f, 0x0e,
+			0x0d, 0x0c, 0x0b, 0x09,
+		];
+		nibbles.push(...rxOffsets.reduce((p, offset, i) => {
+			const bit = bytes[offset] & 0x01;
 			if (i % 4 === 0) {
 				p.push(bit << 3);
 			} else {
