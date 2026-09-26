@@ -1325,8 +1325,9 @@ export function convertRcmToSeq(rcm, options) {
 					break;
 				case EVENT.AFTER_K:
 					if (chNo >= 0) {
-						const [noteNo, value] = maskValues([gt, vel], `Invalid AFTER K. event: [${hexStr(event)}]`);
-						setEvent(smfTrack, timestamp, makeMidiEvent(0xa, chNo, noteNo, value));
+						const [rawNoteNo, value] = maskValues([gt, vel], `Invalid AFTER K. event: [${hexStr(event)}]`);
+						// Transposes the key in the same way as notes. The official players fold it by octaves when it is out of range.
+						setEvent(smfTrack, timestamp, makeMidiEvent(0xa, chNo, foldNoteNo(rawNoteNo + keyShift), value));
 					}
 					break;
 				case EVENT.PROGRAM:
@@ -1985,6 +1986,17 @@ function rawTrimNul(bytes) {
 	} else {
 		return bytes.slice(0, index);
 	}
+}
+
+function foldNoteNo(noteNo) {
+	let foldedNo = noteNo;
+	while (foldedNo < 0) {
+		foldedNo += 12;
+	}
+	while (foldedNo > 0x7f) {
+		foldedNo -= 12;
+	}
+	return foldedNo;
 }
 
 function isIn7bitRange(...values) {
