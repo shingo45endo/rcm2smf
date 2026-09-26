@@ -1085,7 +1085,7 @@ export function convertRcmToSeq(rcm, options) {
 
 	// Time Signature
 	const initialBeat = {numer: 4, denom: 4};
-	if (rcm.header.beatD !== 0 && (rcm.header.beatD & (rcm.header.beatD - 1) === 0)) {
+	if (rcm.header.beatN > 0 && rcm.header.beatD > 0 && (rcm.header.beatD & (rcm.header.beatD - 1)) === 0) {
 		initialBeat.numer = rcm.header.beatN;
 		initialBeat.denom = rcm.header.beatD;
 	}
