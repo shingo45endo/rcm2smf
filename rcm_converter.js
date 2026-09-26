@@ -556,9 +556,9 @@ export function parseG36(buf) {
 	rcm.header.key       = view.getUint8(0x0210);
 	rcm.header.playBias  = view.getInt8(0x0211);
 
-	rcm.header.fileNameGSD  = rawTrim(rawTrimNul(buf.slice(0x0298, 0x02a8)));
-	rcm.header.fileNameGSD2 = rawTrim(rawTrimNul(buf.slice(0x02a8, 0x02b8)));
-	rcm.header.fileNameCM6  = rawTrim(rawTrimNul(buf.slice(0x02b8, 0x02c8)));
+	rcm.header.fileNameCM6  = rawTrim(rawTrimNul(buf.slice(0x0298, 0x02a8)));
+	rcm.header.fileNameGSD  = rawTrim(rawTrimNul(buf.slice(0x02a8, 0x02b8)));
+	rcm.header.fileNameGSD2 = rawTrim(rawTrimNul(buf.slice(0x02b8, 0x02c8)));
 
 	rcm.header.userSysExs = [...new Array(8)].map((_, i) => {
 		const index = 0x0b18 + 48 * i;
