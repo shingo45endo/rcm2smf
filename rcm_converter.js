@@ -1351,23 +1351,27 @@ export function convertRcmToSeq(rcm, options) {
 				case EVENT.UsrExc5:
 				case EVENT.UsrExc6:
 				case EVENT.UsrExc7:
-					if (validateRange(isIn7bitRange(gt, vel), `Invalid UsrExc event: [${hexStr(event)}]`)) {
-						const index = cmd - EVENT.UsrExc0;
-						const {bytes, memo} = rcm.header.userSysExs[index];
-						const sysEx = convertSysEx(bytes, (isAllPortSame) ? chNo : midiCh, gt, vel);
-						if (validateRange(sysEx && isIn7bitRange(sysEx.slice(1, -1)), `Invalid definition of UsrExc${index}: [${hexStr(bytes)}]`)) {
-							setMetaTextUsrExc(smfTrack, timestamp, memo);
-							setEvent(smfTrack, timestamp, sysEx);
+					if (chNo >= 0) {
+						if (validateRange(isIn7bitRange(gt, vel), `Invalid UsrExc event: [${hexStr(event)}]`)) {
+							const index = cmd - EVENT.UsrExc0;
+							const {bytes, memo} = rcm.header.userSysExs[index];
+							const sysEx = convertSysEx(bytes, (isAllPortSame) ? chNo : midiCh, gt, vel);
+							if (validateRange(sysEx && isIn7bitRange(sysEx.slice(1, -1)), `Invalid definition of UsrExc${index}: [${hexStr(bytes)}]`)) {
+								setMetaTextUsrExc(smfTrack, timestamp, memo);
+								setEvent(smfTrack, timestamp, sysEx);
+							}
 						}
 					}
 					break;
 				case EVENT.TrExcl:
-					if (validateRange(isIn7bitRange(gt, vel), `Invalid Tr.Excl event: [${hexStr(event)}]`)) {
-						const bytes = event.slice(4);
-						if (bytes.length > 0) {
-							const sysEx = convertSysEx(bytes, (isAllPortSame) ? chNo : midiCh, gt, vel);
-							if (validateRange(sysEx && isIn7bitRange(sysEx.slice(1, -1)), `Invalid definition of Tr.Excl: [${hexStr(bytes)}]`)) {
-								setEvent(smfTrack, timestamp, sysEx);
+					if (chNo >= 0) {
+						if (validateRange(isIn7bitRange(gt, vel), `Invalid Tr.Excl event: [${hexStr(event)}]`)) {
+							const bytes = event.slice(4);
+							if (bytes.length > 0) {
+								const sysEx = convertSysEx(bytes, (isAllPortSame) ? chNo : midiCh, gt, vel);
+								if (validateRange(sysEx && isIn7bitRange(sysEx.slice(1, -1)), `Invalid definition of Tr.Excl: [${hexStr(bytes)}]`)) {
+									setEvent(smfTrack, timestamp, sysEx);
+								}
 							}
 						}
 					}
@@ -1375,76 +1379,90 @@ export function convertRcmToSeq(rcm, options) {
 
 				// 1-byte DT1 SysEx for Roland devices
 				case EVENT.RolBase:
-					if (validateRange(isIn7bitRange(gt, vel), `Invalid RolBase event: [${hexStr(event)}]`)) {
-						rolBase = [gt, vel];
+					if (chNo >= 0) {
+						if (validateRange(isIn7bitRange(gt, vel), `Invalid RolBase event: [${hexStr(event)}]`)) {
+							rolBase = [gt, vel];
+						}
 					}
 					break;
 				case EVENT.RolDev:
-					if (validateRange(isIn7bitRange(gt, vel), `Invalid RolDev# event: [${hexStr(event)}]`)) {
-						rolDev = [gt, vel];
+					if (chNo >= 0) {
+						if (validateRange(isIn7bitRange(gt, vel), `Invalid RolDev# event: [${hexStr(event)}]`)) {
+							rolDev = [gt, vel];
+						}
 					}
 					break;
 				case EVENT.RolPara:
-					if (validateRange(isIn7bitRange(gt, vel), `Invalid RolPara event: [${hexStr(event)}]`)) {
-						// Initializes RolDev# and RolBase if they have not been set yet.
-						if (!rolDev) {
-							rolDev = [settings.rolandDevId, settings.rolandModelId];
-							console.warn(`RolDev# has not been set yet. Initialized to [${hexStr(rolDev)}].`);
+					if (chNo >= 0) {
+						if (validateRange(isIn7bitRange(gt, vel), `Invalid RolPara event: [${hexStr(event)}]`)) {
+							// Initializes RolDev# and RolBase if they have not been set yet.
+							if (!rolDev) {
+								rolDev = [settings.rolandDevId, settings.rolandModelId];
+								console.warn(`RolDev# has not been set yet. Initialized to [${hexStr(rolDev)}].`);
+							}
+							if (!rolBase) {
+								rolBase = [settings.rolandBaseAddrH, settings.rolandBaseAddrM];
+								console.warn(`RolBase has not been set yet. Initialized to [${hexStr(rolBase)}].`);
+							}
+							// Makes a SysEx by UsrExcl/Tr.Excl parser.
+							const bytes = [0x41, ...rolDev, 0x12, 0x83, ...rolBase, 0x80, 0x81, 0x84];
+							console.assert(bytes.length === 10);
+							setEvent(smfTrack, timestamp, convertSysEx(bytes, 0, gt, vel));
 						}
-						if (!rolBase) {
-							rolBase = [settings.rolandBaseAddrH, settings.rolandBaseAddrM];
-							console.warn(`RolBase has not been set yet. Initialized to [${hexStr(rolBase)}].`);
-						}
-						// Makes a SysEx by UsrExcl/Tr.Excl parser.
-						const bytes = [0x41, ...rolDev, 0x12, 0x83, ...rolBase, 0x80, 0x81, 0x84];
-						console.assert(bytes.length === 10);
-						setEvent(smfTrack, timestamp, convertSysEx(bytes, 0, gt, vel));
 					}
 					break;
 
 				// 1-byte parameter change SysEx for Yamaha XG devices
 				case EVENT.YamBase:
-					if (validateRange(isIn7bitRange(gt, vel), `Invalid YamBase event: [${hexStr(event)}]`)) {
-						yamBase = [gt, vel];
+					if (chNo >= 0) {
+						if (validateRange(isIn7bitRange(gt, vel), `Invalid YamBase event: [${hexStr(event)}]`)) {
+							yamBase = [gt, vel];
+						}
 					}
 					break;
 				case EVENT.YamDev:
-					if (validateRange(isIn7bitRange(gt, vel), `Invalid YamDev# event: [${hexStr(event)}]`)) {
-						yamDev = [gt, vel];
+					if (chNo >= 0) {
+						if (validateRange(isIn7bitRange(gt, vel), `Invalid YamDev# event: [${hexStr(event)}]`)) {
+							yamDev = [gt, vel];
+						}
 					}
 					break;
 				case EVENT.YamPara:
-					if (validateRange(isIn7bitRange(gt, vel), `Invalid YamPara event: [${hexStr(event)}]`)) {
-						// Initializes YamDev# and YamBase if they have not been set yet.
-						if (!yamDev) {
-							yamDev = [settings.yamahaDevId, settings.yamahaModelId];
-							console.warn(`YamDev# has not been set yet. Initialized to [${hexStr(yamDev)}].`);
+					if (chNo >= 0) {
+						if (validateRange(isIn7bitRange(gt, vel), `Invalid YamPara event: [${hexStr(event)}]`)) {
+							// Initializes YamDev# and YamBase if they have not been set yet.
+							if (!yamDev) {
+								yamDev = [settings.yamahaDevId, settings.yamahaModelId];
+								console.warn(`YamDev# has not been set yet. Initialized to [${hexStr(yamDev)}].`);
+							}
+							if (!yamBase) {
+								yamBase = [settings.yamahaBaseAddrH, settings.yamahaBaseAddrM];
+								console.warn(`YamBase has not been set yet. Initialized to [${hexStr(yamBase)}].`);
+							}
+							// Makes a SysEx by UsrExcl/Tr.Excl parser.
+							const bytes = [0x43, ...yamDev, 0x83, ...yamBase, 0x80, 0x81, 0x84];
+							console.assert(bytes.length === 9);
+							setEvent(smfTrack, timestamp, convertSysEx(bytes, 0, gt, vel));
 						}
-						if (!yamBase) {
-							yamBase = [settings.yamahaBaseAddrH, settings.yamahaBaseAddrM];
-							console.warn(`YamBase has not been set yet. Initialized to [${hexStr(yamBase)}].`);
-						}
-						// Makes a SysEx by UsrExcl/Tr.Excl parser.
-						const bytes = [0x43, ...yamDev, 0x83, ...yamBase, 0x80, 0x81, 0x84];
-						console.assert(bytes.length === 9);
-						setEvent(smfTrack, timestamp, convertSysEx(bytes, 0, gt, vel));
 					}
 					break;
 				case EVENT.XGPara:
-					if (validateRange(isIn7bitRange(gt, vel), `Invalid XGPara event: [${hexStr(event)}]`)) {
-						// Initializes YamDev# and YamBase if they have not been set yet.
-						if (!yamDev) {
-							yamDev = [settings.yamahaDevId, settings.yamahaModelId];
-							console.warn(`YamDev# has not been set yet. Initialized to [${hexStr(yamDev)}].`);
+					if (chNo >= 0) {
+						if (validateRange(isIn7bitRange(gt, vel), `Invalid XGPara event: [${hexStr(event)}]`)) {
+							// Initializes YamDev# and YamBase if they have not been set yet.
+							if (!yamDev) {
+								yamDev = [settings.yamahaDevId, settings.yamahaModelId];
+								console.warn(`YamDev# has not been set yet. Initialized to [${hexStr(yamDev)}].`);
+							}
+							if (!yamBase) {
+								yamBase = [settings.yamahaBaseAddrH, settings.yamahaBaseAddrM];
+								console.warn(`YamBase has not been set yet. Initialized to [${hexStr(yamBase)}].`);
+							}
+							// Makes a SysEx.
+							const bytes = [0xf0, 0x43, ...yamDev, ...yamBase, gt, vel, 0xf7];
+							console.assert(bytes.length === 9);
+							setEvent(smfTrack, timestamp, bytes);
 						}
-						if (!yamBase) {
-							yamBase = [settings.yamahaBaseAddrH, settings.yamahaBaseAddrM];
-							console.warn(`YamBase has not been set yet. Initialized to [${hexStr(yamBase)}].`);
-						}
-						// Makes a SysEx.
-						const bytes = [0xf0, 0x43, ...yamDev, ...yamBase, gt, vel, 0xf7];
-						console.assert(bytes.length === 9);
-						setEvent(smfTrack, timestamp, bytes);
 					}
 					break;
 
