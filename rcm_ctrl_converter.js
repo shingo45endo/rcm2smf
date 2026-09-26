@@ -217,8 +217,8 @@ export function convertGsdToSysEx(buf) {
 		nibbles.push(...nibblize(bytes[0x16]), bytes[0x17] & 0x0f, bytes[0x18] & 0x0f);
 		console.assert(nibbles.length === 16, {nibbles});
 
-		// [16-27] Part Level, Part Panpot, Velocity Sense Offset, Velocity Sense Depth, Key Range Low, and Key Range High
-		nibbles.push(...nibblize(bytes[0x19]), ...nibblize(bytes[0x1c]), ...nibblize(bytes[0x1b]), ...nibblize(bytes[0x1a]), ...nibblize(bytes[0x1d]), ...nibblize(bytes[0x1e]));
+		// [16-27] Part Level, Part Panpot, Velocity Sense Depth, Velocity Sense Offset, Key Range Low, and Key Range High
+		nibbles.push(...nibblize(bytes[0x19]), ...nibblize(bytes[0x1c]), ...nibblize(bytes[0x1a]), ...nibblize(bytes[0x1b]), ...nibblize(bytes[0x1d]), ...nibblize(bytes[0x1e]));
 		console.assert(nibbles.length === 28, {nibbles});
 
 		// [28-47] Chorus Send Depth, Reverb Send Depth, and Tone Modify 1-8
