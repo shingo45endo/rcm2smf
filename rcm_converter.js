@@ -836,16 +836,22 @@ function extractRhythm(seqEvents, patternEvents, settings) {
 	// Sequence track
 	const extractedEvents = [];
 	for (const seq of seqEvents) {
-		if (seq[0] === EVENT_MCP.TrackEnd) {
+		if (seq[0] >= EVENT_MCP.TrackEnd) {
 			break;
 		}
 
-		// Chooses a rhythm pattern.
+		// Chooses a rhythm pattern in the same way as CV.EXE.
+		// The No. next to the last pattern ends the track, and No.0 or larger Nos. are replaced with No.1.
 		const [patternNo, ...velValues] = seq;
-		const pattern = patterns[patternNo - 1];
+		if (patternNo === patterns.length + 1) {
+			break;
+		}
+		const isValidNo = (1 <= patternNo && patternNo <= patterns.length);
+		validate(isValidNo, `Invalid rhythm pattern No.${patternNo}: [${hexStr(seq)}] Replaced with No.1.`);
+		const pattern = (isValidNo) ? patterns[patternNo - 1] : patterns[0];
 
 		// Extracts the rhythm pattern with velocity data from sequence track.
-		if (validate(pattern, `Invalid rhythm pattern No.${patternNo}: [${hexStr(seq)}]`)) {
+		if (pattern) {
 			for (const shot of pattern) {
 				const st = shot[3];
 				const velBits = shot.slice(0, 3).reduce((p, c) => {
