@@ -117,8 +117,8 @@ const EVENT_RCP = Object.freeze({
 	DX7_2_P:   0xce,	// DX7-2 PCED
 	TX802_P:   0xcf,	// TX802 PCED
 	YamBase:   0xd0,	// Yamaha Base Address
-	YamDev:    0xd1,	// Yamaha Dev# & Model ID
-	YamPara:   0xd2,	// Yamaha Address & Parameter
+	YamPara:   0xd1,	// Yamaha Address & Parameter
+	YamDev:    0xd2,	// Yamaha Dev# & Model ID
 	XGPara:    0xd3,	// Yamaha XG Address & Parameter
 	MKS_7:     0xdc,	// Roland MKS-7
 	RolBase:   0xdd,	// Roland Base Address
