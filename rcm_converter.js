@@ -117,8 +117,8 @@ const EVENT_RCP = Object.freeze({
 	DX7_2_P:   0xce,	// DX7-2 PCED
 	TX802_P:   0xcf,	// TX802 PCED
 	YamBase:   0xd0,	// Yamaha Base Address
-	YamDev:    0xd1,	// Yamaha Dev# & Model ID
-	YamPara:   0xd2,	// Yamaha Address & Parameter
+	YamPara:   0xd1,	// Yamaha Address & Parameter
+	YamDev:    0xd2,	// Yamaha Dev# & Model ID
 	XGPara:    0xd3,	// Yamaha XG Address & Parameter
 	MKS_7:     0xdc,	// Roland MKS-7
 	RolBase:   0xdd,	// Roland Base Address
@@ -348,7 +348,7 @@ export function parseMcp(buf) {
 	rcm.header.tempo    = view.getUint8(0x21);
 	rcm.header.beatN    = view.getUint8(0x22);
 	rcm.header.beatD    = view.getUint8(0x23);
-	rcm.header.key      = view.getUint8(0x24);
+	rcm.header.key      = convertKeyMcpToRcp(view.getUint8(0x24));
 
 	if (buf[0x60] !== 0x00 && buf[0x60] !== 0x20) {
 		rcm.header.fileNameMTD = new Uint8Array([...rawTrim(rawTrimNul(buf.slice(0x60, 0x66))), '.'.codePointAt(), ...rawTrim(rawTrimNul(buf.slice(0x66, 0x69)))]);
@@ -391,6 +391,21 @@ export function parseMcp(buf) {
 	}
 
 	return rcm;
+
+	function convertKeyMcpToRcp(keyMcp) {
+		// MCP numbers keys as 0-11: C-B major, 12-23: Am-G#m, and 24-29: enharmonic keys.
+		// (The same table as CV.EXE, an official MCP to RCP converter)
+		const keysRcp = [
+			0x00, 0x0d, 0x02, 0x0b, 0x04, 0x09, 0x06, 0x01, 0x0c, 0x03, 0x0a, 0x05,
+			0x10, 0x1d, 0x12, 0x1b, 0x14, 0x19, 0x1e, 0x11, 0x1c, 0x13, 0x1a, 0x15,
+			0x07, 0x0e, 0x1f, 0x17, 0x16, 0x0f,
+		];
+		if (keyMcp >= keysRcp.length) {
+			console.warn(`Invalid key of MCP: ${keyMcp}. Changed to C major.`);
+			return 0x00;
+		}
+		return keysRcp[keyMcp];
+	}
 }
 
 export function parseRcp(buf) {
@@ -541,9 +556,9 @@ export function parseG36(buf) {
 	rcm.header.key       = view.getUint8(0x0210);
 	rcm.header.playBias  = view.getInt8(0x0211);
 
-	rcm.header.fileNameGSD  = rawTrim(rawTrimNul(buf.slice(0x0298, 0x02a8)));
-	rcm.header.fileNameGSD2 = rawTrim(rawTrimNul(buf.slice(0x02a8, 0x02b8)));
-	rcm.header.fileNameCM6  = rawTrim(rawTrimNul(buf.slice(0x02b8, 0x02c8)));
+	rcm.header.fileNameCM6  = rawTrim(rawTrimNul(buf.slice(0x0298, 0x02a8)));
+	rcm.header.fileNameGSD  = rawTrim(rawTrimNul(buf.slice(0x02a8, 0x02b8)));
+	rcm.header.fileNameGSD2 = rawTrim(rawTrimNul(buf.slice(0x02b8, 0x02c8)));
 
 	rcm.header.userSysExs = [...new Array(8)].map((_, i) => {
 		const index = 0x0b18 + 48 * i;
@@ -821,28 +836,35 @@ function extractRhythm(seqEvents, patternEvents, settings) {
 	// Sequence track
 	const extractedEvents = [];
 	for (const seq of seqEvents) {
-		if (seq[0] === EVENT_MCP.TrackEnd) {
+		if (seq[0] >= EVENT_MCP.TrackEnd) {
 			break;
 		}
 
-		// Chooses a rhythm pattern.
+		// Chooses a rhythm pattern in the same way as CV.EXE.
+		// The No. next to the last pattern ends the track, and No.0 or larger Nos. are replaced with No.1.
 		const [patternNo, ...velValues] = seq;
-		const pattern = patterns[patternNo - 1];
+		if (patternNo === patterns.length + 1) {
+			break;
+		}
+		const isValidNo = (1 <= patternNo && patternNo <= patterns.length);
+		validate(isValidNo, `Invalid rhythm pattern No.${patternNo}: [${hexStr(seq)}] Replaced with No.1.`);
+		const pattern = (isValidNo) ? patterns[patternNo - 1] : patterns[0];
 
 		// Extracts the rhythm pattern with velocity data from sequence track.
-		if (validate(pattern, `Invalid rhythm pattern No.${patternNo}: [${hexStr(seq)}]`)) {
+		if (pattern) {
 			for (const shot of pattern) {
 				const st = shot[3];
+				// Bits 7-6 of the 1st byte are not used. Some files have them set.
 				const velBits = shot.slice(0, 3).reduce((p, c) => {
 					p.push(...[(c >> 6) & 0x03, (c >> 4) & 0x03, (c >> 2) & 0x03, c & 0x03]);
 					return p;
-				}, []);
+				}, []).slice(1);
 
 				const events = velBits.reduce((p, c, i) => {
 					if (c > 0) {
 						const event = [
-							//  BD, SD, LT, MT, HT, RS, HC, CH, OH, CC, RC
-							[0, 36, 38, 41, 45, 48, 37, 39, 42, 46, 49, 51][i],	// Note No.
+							// BD,SD,LT, MT, HT, RS, HC, CH, OH, CC, RC
+							[36, 38, 41, 45, 48, 37, 39, 42, 46, 49, 51][i],	// Note No.
 							0,					// Step time
 							1,					// Gate time
 							velValues[c - 1],	// Velocity
@@ -1061,6 +1083,10 @@ export function convertRcmToSeq(rcm, options) {
 	const makeNoteOff = (settings.noteOff) ? (chNo, noteNo) => makeMidiEvent(0x8, chNo, noteNo, settings.noteOffVel) : (chNo, noteNo) => makeMidiEvent(0x9, chNo, noteNo, 0);
 
 	const validateRange = (settings.ignoreOutOfRange) ? (isValid, message) => validateAndIgnore(isValid, message) : (isValid, message) => validateAndThrow(isValid, message);
+	const maskValues = (settings.ignoreOutOfRange) ? (values, message) => maskAndWarn(values, message) : (values, message) => {
+		validateAndThrow(isIn7bitRange(...values), message);
+		return values;
+	};
 	const throwOrIgnore = (settings.ignoreWrongEvent) ? (message) => validateAndIgnore(false, message) : (message) => validateAndThrow(false, message);
 
 	// SMF-related variables
@@ -1085,7 +1111,7 @@ export function convertRcmToSeq(rcm, options) {
 
 	// Time Signature
 	const initialBeat = {numer: 4, denom: 4};
-	if (rcm.header.beatD !== 0 && (rcm.header.beatD & (rcm.header.beatD - 1) === 0)) {
+	if (rcm.header.beatN > 0 && rcm.header.beatD > 0 && (rcm.header.beatD & (rcm.header.beatD - 1)) === 0) {
 		initialBeat.numer = rcm.header.beatN;
 		initialBeat.denom = rcm.header.beatD;
 	}
@@ -1226,7 +1252,7 @@ export function convertRcmToSeq(rcm, options) {
 
 	// Converts each track.
 	const EVENT = (rcm.header.isMCP) ? EVENT_MCP : EVENT_RCP;
-	const isAllPortSame = ((new Set(rcm.tracks.map((e) => e.portNo))).size === 1);
+	const isAllPortSame = (collectPortNos(rcm.tracks, EVENT.MIDI_CH).size <= 1);
 	const isNoteOff = (rcm.header.isMCP) ? ((gt, st) => (gt < st)) : ((gt, st) => (gt <= st));
 	let maxDuration = 0;
 	const tempoEventMap = new Map();
@@ -1260,12 +1286,14 @@ export function convertRcmToSeq(rcm, options) {
 			if (cmd < 0x80) {
 				// Note event
 				if (chNo >= 0 && gt > 0 && vel > 0) {
-					if (validateRange(isIn7bitRange(vel), `Invalid note-on event: [${hexStr(event)}]`)) {
+					const [velocity] = maskValues([vel], `Invalid note-on event: [${hexStr(event)}]`);
+					// If the velocity becomes 0 as a result of masking, do not trigger a note-on.
+					if (velocity > 0) {
 						const noteNo = cmd + keyShift;
 						if (0 <= noteNo && noteNo < 0x80) {
 							// Note on or tie
 							if (noteGts[noteNo] < 0) {
-								setEvent(smfTrack, timestamp, makeMidiEvent(0x9, chNo, noteNo, vel));
+								setEvent(smfTrack, timestamp, makeMidiEvent(0x9, chNo, noteNo, velocity));
 							}
 							noteGts[noteNo] = gt;
 						} else {
@@ -1280,30 +1308,27 @@ export function convertRcmToSeq(rcm, options) {
 				// MIDI messages
 				case EVENT.CONTROL:
 					if (chNo >= 0) {
-						if (validateRange(isIn7bitRange(gt, vel), `Invalid CONTROL event: [${hexStr(event)}]`)) {
-							setEvent(smfTrack, timestamp, makeMidiEvent(0xb, chNo, gt, vel));
-						}
+						const [ctrlNo, value] = maskValues([gt, vel], `Invalid CONTROL event: [${hexStr(event)}]`);
+						setEvent(smfTrack, timestamp, makeMidiEvent(0xb, chNo, ctrlNo, value));
 					}
 					break;
 				case EVENT.PITCH:
 					if (chNo >= 0) {
-						if (validateRange(isIn7bitRange(gt, vel), `Invalid PITCH event: [${hexStr(event)}]`)) {
-							setEvent(smfTrack, timestamp, makeMidiEvent(0xe, chNo, gt, vel));
-						}
+						const [lsb, msb] = maskValues([gt, vel], `Invalid PITCH event: [${hexStr(event)}]`);
+						setEvent(smfTrack, timestamp, makeMidiEvent(0xe, chNo, lsb, msb));
 					}
 					break;
 				case EVENT.AFTER_C:
 					if (chNo >= 0) {
-						if (validateRange(isIn7bitRange(gt), `Invalid AFTER C. event: [${hexStr(event)}]`)) {
-							setEvent(smfTrack, timestamp, makeMidiEvent(0xd, chNo, gt));
-						}
+						const [value] = maskValues([gt], `Invalid AFTER C. event: [${hexStr(event)}]`);
+						setEvent(smfTrack, timestamp, makeMidiEvent(0xd, chNo, value));
 					}
 					break;
 				case EVENT.AFTER_K:
 					if (chNo >= 0) {
-						if (validateRange(isIn7bitRange(gt, vel), `Invalid AFTER K. event: [${hexStr(event)}]`)) {
-							setEvent(smfTrack, timestamp, makeMidiEvent(0xa, chNo, gt, vel));
-						}
+						const [rawNoteNo, value] = maskValues([gt, vel], `Invalid AFTER K. event: [${hexStr(event)}]`);
+						// Transposes the key in the same way as notes. The official players fold it by octaves when it is out of range.
+						setEvent(smfTrack, timestamp, makeMidiEvent(0xa, chNo, foldNoteNo(rawNoteNo + keyShift), value));
 					}
 					break;
 				case EVENT.PROGRAM:
@@ -1313,13 +1338,22 @@ export function convertRcmToSeq(rcm, options) {
 						}
 					}
 					break;
-				case EVENT.BankPrgL:
 				case EVENT.BankPrg:
 					if (chNo >= 0) {
 						if (validateRange(isIn7bitRange(gt, vel), `Invalid BankPrg event: [${hexStr(event)}]`)) {
-							// Note: According to the MIDI spec, Bank Select must be transmitted as a pair of MSB and LSB.
-							// But, a BankPrg event is converted to a single MSB or LSB at the current implementation.
-							setEvent(smfTrack, timestamp, makeMidiEvent(0xb, chNo, (cmd === EVENT.BankPrg) ? 0 : 32, vel));
+							// Sends Bank Select as a pair of MSB and LSB. The LSB is always 0.
+							setEvent(smfTrack, timestamp, makeMidiEvent(0xb, chNo, 0, vel));
+							setEvent(smfTrack, timestamp, makeMidiEvent(0xb, chNo, 32, 0));
+							setEvent(smfTrack, timestamp, makeMidiEvent(0xc, chNo, gt));
+						}
+					}
+					break;
+				case EVENT.BankPrgL:
+					if (chNo >= 0) {
+						if (validateRange(isIn7bitRange(gt, vel), `Invalid BankPrgL event: [${hexStr(event)}]`)) {
+							// The same byte order as BankPrg, but the bank No. is for the LSB. The MSB is always 0.
+							setEvent(smfTrack, timestamp, makeMidiEvent(0xb, chNo, 0, 0));
+							setEvent(smfTrack, timestamp, makeMidiEvent(0xb, chNo, 32, vel));
 							setEvent(smfTrack, timestamp, makeMidiEvent(0xc, chNo, gt));
 						}
 					}
@@ -1351,23 +1385,27 @@ export function convertRcmToSeq(rcm, options) {
 				case EVENT.UsrExc5:
 				case EVENT.UsrExc6:
 				case EVENT.UsrExc7:
-					if (validateRange(isIn7bitRange(gt, vel), `Invalid UsrExc event: [${hexStr(event)}]`)) {
-						const index = cmd - EVENT.UsrExc0;
-						const {bytes, memo} = rcm.header.userSysExs[index];
-						const sysEx = convertSysEx(bytes, (isAllPortSame) ? chNo : midiCh, gt, vel);
-						if (validateRange(sysEx && isIn7bitRange(sysEx.slice(1, -1)), `Invalid definition of UsrExc${index}: [${hexStr(bytes)}]`)) {
-							setMetaTextUsrExc(smfTrack, timestamp, memo);
-							setEvent(smfTrack, timestamp, sysEx);
+					if (chNo >= 0) {
+						if (validateRange(isIn7bitRange(gt, vel), `Invalid UsrExc event: [${hexStr(event)}]`)) {
+							const index = cmd - EVENT.UsrExc0;
+							const {bytes, memo} = rcm.header.userSysExs[index];
+							const sysEx = convertSysEx(bytes, chNo, gt, vel);
+							if (validateRange(sysEx && isIn7bitRange(sysEx.slice(1, -1)), `Invalid definition of UsrExc${index}: [${hexStr(bytes)}]`)) {
+								setMetaTextUsrExc(smfTrack, timestamp, memo);
+								setEvent(smfTrack, timestamp, sysEx);
+							}
 						}
 					}
 					break;
 				case EVENT.TrExcl:
-					if (validateRange(isIn7bitRange(gt, vel), `Invalid Tr.Excl event: [${hexStr(event)}]`)) {
-						const bytes = event.slice(4);
-						if (bytes.length > 0) {
-							const sysEx = convertSysEx(bytes, (isAllPortSame) ? chNo : midiCh, gt, vel);
-							if (validateRange(sysEx && isIn7bitRange(sysEx.slice(1, -1)), `Invalid definition of Tr.Excl: [${hexStr(bytes)}]`)) {
-								setEvent(smfTrack, timestamp, sysEx);
+					if (chNo >= 0) {
+						if (validateRange(isIn7bitRange(gt, vel), `Invalid Tr.Excl event: [${hexStr(event)}]`)) {
+							const bytes = event.slice(4);
+							if (bytes.length > 0) {
+								const sysEx = convertSysEx(bytes, chNo, gt, vel);
+								if (validateRange(sysEx && isIn7bitRange(sysEx.slice(1, -1)), `Invalid definition of Tr.Excl: [${hexStr(bytes)}]`)) {
+									setEvent(smfTrack, timestamp, sysEx);
+								}
 							}
 						}
 					}
@@ -1375,76 +1413,90 @@ export function convertRcmToSeq(rcm, options) {
 
 				// 1-byte DT1 SysEx for Roland devices
 				case EVENT.RolBase:
-					if (validateRange(isIn7bitRange(gt, vel), `Invalid RolBase event: [${hexStr(event)}]`)) {
-						rolBase = [gt, vel];
+					if (chNo >= 0) {
+						if (validateRange(isIn7bitRange(gt, vel), `Invalid RolBase event: [${hexStr(event)}]`)) {
+							rolBase = [gt, vel];
+						}
 					}
 					break;
 				case EVENT.RolDev:
-					if (validateRange(isIn7bitRange(gt, vel), `Invalid RolDev# event: [${hexStr(event)}]`)) {
-						rolDev = [gt, vel];
+					if (chNo >= 0) {
+						if (validateRange(isIn7bitRange(gt, vel), `Invalid RolDev# event: [${hexStr(event)}]`)) {
+							rolDev = [gt, vel];
+						}
 					}
 					break;
 				case EVENT.RolPara:
-					if (validateRange(isIn7bitRange(gt, vel), `Invalid RolPara event: [${hexStr(event)}]`)) {
-						// Initializes RolDev# and RolBase if they have not been set yet.
-						if (!rolDev) {
-							rolDev = [settings.rolandDevId, settings.rolandModelId];
-							console.warn(`RolDev# has not been set yet. Initialized to [${hexStr(rolDev)}].`);
+					if (chNo >= 0) {
+						if (validateRange(isIn7bitRange(gt, vel), `Invalid RolPara event: [${hexStr(event)}]`)) {
+							// Initializes RolDev# and RolBase if they have not been set yet.
+							if (!rolDev) {
+								rolDev = [settings.rolandDevId, settings.rolandModelId];
+								console.warn(`RolDev# has not been set yet. Initialized to [${hexStr(rolDev)}].`);
+							}
+							if (!rolBase) {
+								rolBase = [settings.rolandBaseAddrH, settings.rolandBaseAddrM];
+								console.warn(`RolBase has not been set yet. Initialized to [${hexStr(rolBase)}].`);
+							}
+							// Makes a SysEx by UsrExcl/Tr.Excl parser.
+							const bytes = [0x41, ...rolDev, 0x12, 0x83, ...rolBase, 0x80, 0x81, 0x84];
+							console.assert(bytes.length === 10);
+							setEvent(smfTrack, timestamp, convertSysEx(bytes, 0, gt, vel));
 						}
-						if (!rolBase) {
-							rolBase = [settings.rolandBaseAddrH, settings.rolandBaseAddrM];
-							console.warn(`RolBase has not been set yet. Initialized to [${hexStr(rolBase)}].`);
-						}
-						// Makes a SysEx by UsrExcl/Tr.Excl parser.
-						const bytes = [0x41, ...rolDev, 0x12, 0x83, ...rolBase, 0x80, 0x81, 0x84];
-						console.assert(bytes.length === 10);
-						setEvent(smfTrack, timestamp, convertSysEx(bytes, 0, gt, vel));
 					}
 					break;
 
 				// 1-byte parameter change SysEx for Yamaha XG devices
 				case EVENT.YamBase:
-					if (validateRange(isIn7bitRange(gt, vel), `Invalid YamBase event: [${hexStr(event)}]`)) {
-						yamBase = [gt, vel];
+					if (chNo >= 0) {
+						if (validateRange(isIn7bitRange(gt, vel), `Invalid YamBase event: [${hexStr(event)}]`)) {
+							yamBase = [gt, vel];
+						}
 					}
 					break;
 				case EVENT.YamDev:
-					if (validateRange(isIn7bitRange(gt, vel), `Invalid YamDev# event: [${hexStr(event)}]`)) {
-						yamDev = [gt, vel];
+					if (chNo >= 0) {
+						if (validateRange(isIn7bitRange(gt, vel), `Invalid YamDev# event: [${hexStr(event)}]`)) {
+							yamDev = [gt, vel];
+						}
 					}
 					break;
 				case EVENT.YamPara:
-					if (validateRange(isIn7bitRange(gt, vel), `Invalid YamPara event: [${hexStr(event)}]`)) {
-						// Initializes YamDev# and YamBase if they have not been set yet.
-						if (!yamDev) {
-							yamDev = [settings.yamahaDevId, settings.yamahaModelId];
-							console.warn(`YamDev# has not been set yet. Initialized to [${hexStr(yamDev)}].`);
+					if (chNo >= 0) {
+						if (validateRange(isIn7bitRange(gt, vel), `Invalid YamPara event: [${hexStr(event)}]`)) {
+							// Initializes YamDev# and YamBase if they have not been set yet.
+							if (!yamDev) {
+								yamDev = [settings.yamahaDevId, settings.yamahaModelId];
+								console.warn(`YamDev# has not been set yet. Initialized to [${hexStr(yamDev)}].`);
+							}
+							if (!yamBase) {
+								yamBase = [settings.yamahaBaseAddrH, settings.yamahaBaseAddrM];
+								console.warn(`YamBase has not been set yet. Initialized to [${hexStr(yamBase)}].`);
+							}
+							// Makes a SysEx by UsrExcl/Tr.Excl parser.
+							const bytes = [0x43, ...yamDev, 0x83, ...yamBase, 0x80, 0x81, 0x84];
+							console.assert(bytes.length === 9);
+							setEvent(smfTrack, timestamp, convertSysEx(bytes, 0, gt, vel));
 						}
-						if (!yamBase) {
-							yamBase = [settings.yamahaBaseAddrH, settings.yamahaBaseAddrM];
-							console.warn(`YamBase has not been set yet. Initialized to [${hexStr(yamBase)}].`);
-						}
-						// Makes a SysEx by UsrExcl/Tr.Excl parser.
-						const bytes = [0x43, ...yamDev, 0x83, ...yamBase, 0x80, 0x81, 0x84];
-						console.assert(bytes.length === 9);
-						setEvent(smfTrack, timestamp, convertSysEx(bytes, 0, gt, vel));
 					}
 					break;
 				case EVENT.XGPara:
-					if (validateRange(isIn7bitRange(gt, vel), `Invalid XGPara event: [${hexStr(event)}]`)) {
-						// Initializes YamDev# and YamBase if they have not been set yet.
-						if (!yamDev) {
-							yamDev = [settings.yamahaDevId, settings.yamahaModelId];
-							console.warn(`YamDev# has not been set yet. Initialized to [${hexStr(yamDev)}].`);
+					if (chNo >= 0) {
+						if (validateRange(isIn7bitRange(gt, vel), `Invalid XGPara event: [${hexStr(event)}]`)) {
+							// Initializes YamDev# and YamBase if they have not been set yet.
+							if (!yamDev) {
+								yamDev = [settings.yamahaDevId, settings.yamahaModelId];
+								console.warn(`YamDev# has not been set yet. Initialized to [${hexStr(yamDev)}].`);
+							}
+							if (!yamBase) {
+								yamBase = [settings.yamahaBaseAddrH, settings.yamahaBaseAddrM];
+								console.warn(`YamBase has not been set yet. Initialized to [${hexStr(yamBase)}].`);
+							}
+							// Makes a SysEx.
+							const bytes = [0xf0, 0x43, ...yamDev, ...yamBase, gt, vel, 0xf7];
+							console.assert(bytes.length === 9);
+							setEvent(smfTrack, timestamp, bytes);
 						}
-						if (!yamBase) {
-							yamBase = [settings.yamahaBaseAddrH, settings.yamahaBaseAddrM];
-							console.warn(`YamBase has not been set yet. Initialized to [${hexStr(yamBase)}].`);
-						}
-						// Makes a SysEx.
-						const bytes = [0xf0, 0x43, ...yamDev, ...yamBase, gt, vel, 0xf7];
-						console.assert(bytes.length === 9);
-						setEvent(smfTrack, timestamp, bytes);
 					}
 					break;
 
@@ -1457,7 +1509,7 @@ export function convertRcmToSeq(rcm, options) {
 						portNo = (midiCh >= 0) ? Math.trunc(midiCh / 16) : portNo;
 
 						// Adds an unofficial MIDI Port meta event if necessary.
-						if (portNo !== oldPortNo) {
+						if (!isAllPortSame && portNo !== oldPortNo) {
 							// TODO: Investigate whether this event can be appeared in the song body.
 							setEvent(smfTrack, timestamp, [0xff, 0x21, 0x01, portNo]);
 						}
@@ -1466,7 +1518,10 @@ export function convertRcmToSeq(rcm, options) {
 
 				case EVENT.TEMPO:
 					if (validateRange((gt > 0), `Invalid tempo rate: ${gt}`)) {	// Note: It can be greater than 255 in G36.
-						tempoEventMap.set(timestamp, event);
+						if (timestamp < 0) {
+							console.warn(`A tempo event appeared previous to the zero point due to ST+. Adjusted it to zero: (${timestamp} -> 0)`);
+						}
+						tempoEventMap.set(Math.max(timestamp, 0), event);
 					}
 					break;
 
@@ -1583,7 +1638,10 @@ export function convertRcmToSeq(rcm, options) {
 
 				default:
 					throwOrIgnore(`Unknown event: [${hexStr(event)}]`);
-					st = 0;
+					// Events below 0xf0 have step time even if they are unknown.
+					if (cmd >= 0xf0) {
+						st = 0;
+					}
 					break;
 				}
 			}
@@ -1624,6 +1682,25 @@ export function convertRcmToSeq(rcm, options) {
 	addTempoEvents(tempoEventMap);
 
 	return seq;
+
+	function collectPortNos(tracks, cmdMidiCh) {
+		const portNos = new Set();
+		for (const track of tracks) {
+			// Skips the track if it is empty or muted.
+			if (!track.extractedEvents || track.extractedEvents.length <= 1 || (track.mode & 0x01) !== 0) {
+				continue;
+			}
+			if (track.midiCh >= 0) {
+				portNos.add(Math.trunc(track.midiCh / 16));
+			}
+			for (const [cmd, _, gt] of track.extractedEvents) {
+				if (cmd === cmdMidiCh && (1 <= gt && gt <= 32)) {
+					portNos.add(Math.trunc((gt - 1) / 16));
+				}
+			}
+		}
+		return portNos;
+	}
 
 	// Note: The process of the tempo graduation is different from the original Recomposer's algorithm.
 	function addTempoEvents(tempoEventMap) {
@@ -1912,6 +1989,17 @@ function rawTrimNul(bytes) {
 	}
 }
 
+function foldNoteNo(noteNo) {
+	let foldedNo = noteNo;
+	while (foldedNo < 0) {
+		foldedNo += 12;
+	}
+	while (foldedNo > 0x7f) {
+		foldedNo -= 12;
+	}
+	return foldedNo;
+}
+
 function isIn7bitRange(...values) {
 	console.assert(values && values.length, 'Invalid argument', {values});
 	return values.every((e) => (e & ~0x7f) === 0);
@@ -1929,6 +2017,13 @@ function validateAndIgnore(isValid, message) {
 		console.warn(`${message} Ignored.`);
 	}
 	return isValid;
+}
+
+function maskAndWarn(values, message) {
+	if (!isIn7bitRange(...values)) {
+		console.warn(`${message} Masked to 7 bits.`);
+	}
+	return values.map((e) => e & 0x7f);
 }
 
 function nop() {
