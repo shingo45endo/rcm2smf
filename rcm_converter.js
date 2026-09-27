@@ -854,16 +854,17 @@ function extractRhythm(seqEvents, patternEvents, settings) {
 		if (pattern) {
 			for (const shot of pattern) {
 				const st = shot[3];
+				// Bits 7-6 of the 1st byte are not used. Some files have them set.
 				const velBits = shot.slice(0, 3).reduce((p, c) => {
 					p.push(...[(c >> 6) & 0x03, (c >> 4) & 0x03, (c >> 2) & 0x03, c & 0x03]);
 					return p;
-				}, []);
+				}, []).slice(1);
 
 				const events = velBits.reduce((p, c, i) => {
 					if (c > 0) {
 						const event = [
-							//  BD, SD, LT, MT, HT, RS, HC, CH, OH, CC, RC
-							[0, 36, 38, 41, 45, 48, 37, 39, 42, 46, 49, 51][i],	// Note No.
+							// BD,SD,LT, MT, HT, RS, HC, CH, OH, CC, RC
+							[36, 38, 41, 45, 48, 37, 39, 42, 46, 49, 51][i],	// Note No.
 							0,					// Step time
 							1,					// Gate time
 							velValues[c - 1],	// Velocity
