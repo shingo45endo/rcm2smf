@@ -235,5 +235,5 @@ const writeFileAsync = util.promisify(fs.writeFile);
 		} else {
 			return Promise.reject(new Error('File not found'));
 		}
-	};
+	}
 })();
