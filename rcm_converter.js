@@ -1334,13 +1334,22 @@ export function convertRcmToSeq(rcm, options) {
 						}
 					}
 					break;
-				case EVENT.BankPrgL:
 				case EVENT.BankPrg:
 					if (chNo >= 0) {
 						if (validateRange(isIn7bitRange(gt, vel), `Invalid BankPrg event: [${hexStr(event)}]`)) {
-							// Note: According to the MIDI spec, Bank Select must be transmitted as a pair of MSB and LSB.
-							// But, a BankPrg event is converted to a single MSB or LSB at the current implementation.
-							setEvent(smfTrack, timestamp, makeMidiEvent(0xb, chNo, (cmd === EVENT.BankPrg) ? 0 : 32, vel));
+							// Sends Bank Select as a pair of MSB and LSB. The LSB is always 0.
+							setEvent(smfTrack, timestamp, makeMidiEvent(0xb, chNo, 0, vel));
+							setEvent(smfTrack, timestamp, makeMidiEvent(0xb, chNo, 32, 0));
+							setEvent(smfTrack, timestamp, makeMidiEvent(0xc, chNo, gt));
+						}
+					}
+					break;
+				case EVENT.BankPrgL:
+					if (chNo >= 0) {
+						if (validateRange(isIn7bitRange(gt, vel), `Invalid BankPrgL event: [${hexStr(event)}]`)) {
+							// The same byte order as BankPrg, but the bank No. is for the LSB. The MSB is always 0.
+							setEvent(smfTrack, timestamp, makeMidiEvent(0xb, chNo, 0, 0));
+							setEvent(smfTrack, timestamp, makeMidiEvent(0xb, chNo, 32, vel));
 							setEvent(smfTrack, timestamp, makeMidiEvent(0xc, chNo, gt));
 						}
 					}
