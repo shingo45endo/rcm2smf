@@ -1247,7 +1247,7 @@ export function convertRcmToSeq(rcm, options) {
 
 	// Converts each track.
 	const EVENT = (rcm.header.isMCP) ? EVENT_MCP : EVENT_RCP;
-	const isAllPortSame = ((new Set(rcm.tracks.map((e) => e.portNo))).size === 1);
+	const isAllPortSame = (collectPortNos(rcm.tracks, EVENT.MIDI_CH).size <= 1);
 	const isNoteOff = (rcm.header.isMCP) ? ((gt, st) => (gt < st)) : ((gt, st) => (gt <= st));
 	let maxDuration = 0;
 	const tempoEventMap = new Map();
@@ -1376,7 +1376,7 @@ export function convertRcmToSeq(rcm, options) {
 						if (validateRange(isIn7bitRange(gt, vel), `Invalid UsrExc event: [${hexStr(event)}]`)) {
 							const index = cmd - EVENT.UsrExc0;
 							const {bytes, memo} = rcm.header.userSysExs[index];
-							const sysEx = convertSysEx(bytes, (isAllPortSame) ? chNo : midiCh, gt, vel);
+							const sysEx = convertSysEx(bytes, chNo, gt, vel);
 							if (validateRange(sysEx && isIn7bitRange(sysEx.slice(1, -1)), `Invalid definition of UsrExc${index}: [${hexStr(bytes)}]`)) {
 								setMetaTextUsrExc(smfTrack, timestamp, memo);
 								setEvent(smfTrack, timestamp, sysEx);
@@ -1389,7 +1389,7 @@ export function convertRcmToSeq(rcm, options) {
 						if (validateRange(isIn7bitRange(gt, vel), `Invalid Tr.Excl event: [${hexStr(event)}]`)) {
 							const bytes = event.slice(4);
 							if (bytes.length > 0) {
-								const sysEx = convertSysEx(bytes, (isAllPortSame) ? chNo : midiCh, gt, vel);
+								const sysEx = convertSysEx(bytes, chNo, gt, vel);
 								if (validateRange(sysEx && isIn7bitRange(sysEx.slice(1, -1)), `Invalid definition of Tr.Excl: [${hexStr(bytes)}]`)) {
 									setEvent(smfTrack, timestamp, sysEx);
 								}
@@ -1496,7 +1496,7 @@ export function convertRcmToSeq(rcm, options) {
 						portNo = (midiCh >= 0) ? Math.trunc(midiCh / 16) : portNo;
 
 						// Adds an unofficial MIDI Port meta event if necessary.
-						if (portNo !== oldPortNo) {
+						if (!isAllPortSame && portNo !== oldPortNo) {
 							// TODO: Investigate whether this event can be appeared in the song body.
 							setEvent(smfTrack, timestamp, [0xff, 0x21, 0x01, portNo]);
 						}
@@ -1666,6 +1666,25 @@ export function convertRcmToSeq(rcm, options) {
 	addTempoEvents(tempoEventMap);
 
 	return seq;
+
+	function collectPortNos(tracks, cmdMidiCh) {
+		const portNos = new Set();
+		for (const track of tracks) {
+			// Skips the track if it is empty or muted.
+			if (!track.extractedEvents || track.extractedEvents.length <= 1 || (track.mode & 0x01) !== 0) {
+				continue;
+			}
+			if (track.midiCh >= 0) {
+				portNos.add(Math.trunc(track.midiCh / 16));
+			}
+			for (const [cmd, _, gt] of track.extractedEvents) {
+				if (cmd === cmdMidiCh && (1 <= gt && gt <= 32)) {
+					portNos.add(Math.trunc((gt - 1) / 16));
+				}
+			}
+		}
+		return portNos;
+	}
 
 	// Note: The process of the tempo graduation is different from the original Recomposer's algorithm.
 	function addTempoEvents(tempoEventMap) {
