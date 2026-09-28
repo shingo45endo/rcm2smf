@@ -64,10 +64,10 @@ const EVENT_MCP = Object.freeze({
 	YamDev:      -1,
 	YamPara:     -1,
 	XGPara:      -1,
-	MKS_7:       -1,
+	MKS_7:     0xe6,	// R.EXCLU (MKS-7 Tone Parameter Change)
 	RolBase:   0xe7,	// MT32BASE
 	RolPara:   0xe8,	// MT32PARA
-	RolDev:    0xe6,	// R.EXCLU
+	RolDev:    0xe9,	// Roland Dev# & Model ID
 	BankPrgL:    -1,
 	BankPrg:     -1,
 	KeyScan:     -1,
