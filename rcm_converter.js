@@ -1126,6 +1126,31 @@ export function convertRcmToSeq(rcm, options) {
 		setEvent(conductorTrack, 0, convertKeySignature(rcm.header.key));
 	}
 
+	// Assigns user programs (128-191) of MCP to patches which the song does not select.
+	// Patches which MTD does not change are used first.
+	// Higher numbers are used first, as users often put their own patches over the sound effects at the end of the presets.
+	const userPatchNos = new Map();
+	if (rcm.header.isMCP && rcm.header.patches) {
+		const allEvents = rcm.tracks.filter((e) => e.extractedEvents).flatMap((e) => e.extractedEvents);
+		const usedProgNos = new Set(allEvents.filter((e) => (e[0] === EVENT_MCP.UserPrg)).map((e) => e[2]));
+		const isDefaultPatch = (patchNo) => {
+			const defaultPatch = [patchNo >> 6, patchNo & 0x3f, 0x18, 0x32, 0x0c, 0x00, 0x01, 0x00];
+			return rcm.header.patches[patchNo].every((e, i) => (e === defaultPatch[i]));
+		};
+		const unusedPatchNos = [...Array(128).keys()].reverse().filter((e) => !usedProgNos.has(e));
+		const freePatchNos = [...unusedPatchNos.filter((e) => isDefaultPatch(e)), ...unusedPatchNos.filter((e) => !isDefaultPatch(e))];
+		for (let progNo = 128; progNo < 192; progNo++) {
+			if (!usedProgNos.has(progNo)) {
+				continue;
+			}
+			if (freePatchNos.length === 0) {
+				console.warn(`No unused patch for user program ${progNo}. Its program changes are ignored.`);
+				continue;
+			}
+			userPatchNos.set(progNo, freePatchNos.shift());
+		}
+	}
+
 	// Adds a setup measure which consists of SysEx converted from control files.
 	if (rcm.header.sysExsMTD || rcm.header.sysExsCM6 || rcm.header.sysExsGSD || rcm.header.sysExsGSD2) {
 		console.assert(!settings.ignoreCtrlFile);
@@ -1156,8 +1181,20 @@ export function convertRcmToSeq(rcm, options) {
 			}
 		}
 		if (rcm.header.sysExsMTD) {
-			// Adds SysEx from MTD file.
-			allSysExs.push(...rcm.header.sysExsMTD);
+			// Adds SysEx from MTD file. Patch Memory has the assigned user programs.
+			const newPatches = rcm.header.patches.slice(0, 128);
+			for (const [progNo, patchNo] of userPatchNos) {
+				newPatches[patchNo] = rcm.header.patches[progNo];
+			}
+			const changedAddrMs = new Set([...userPatchNos.values()].map((e) => e >> 4));
+			allSysExs.push(...rcm.header.sysExsMTD.map((e) => {
+				const [addrH, addrM] = e.slice(5, 7);
+				if (addrH !== 0x05 || !changedAddrMs.has(addrM)) {
+					return e;
+				}
+				const payload = newPatches.slice(addrM * 16, (addrM + 1) * 16).flat();
+				return convertSysEx([0x41, 0x10, 0x16, 0x12, 0x83, 0x05, addrM, 0x00, ...payload, 0x84], 0, 0, 0);
+			}));
 		} else if (rcm.header.sysExsCM6) {
 			// Adds SysEx from CM6 file.
 			allSysExs.push(...rcm.header.sysExsCM6);
@@ -1261,7 +1298,6 @@ export function convertRcmToSeq(rcm, options) {
 
 		const smfTrack = new Map();
 		const noteGts = new Array(128).fill(-1);
-		const patchNos = [...Array(128).keys()];
 		const keyShift = (rcm.header.isMCP || (rcmTrack.keyShift & 0x80) !== 0) ? 0 : rcm.header.playBias + rcmTrack.keyShift - ((rcmTrack.keyShift >= 0x40) ? 0x80 : 0);
 		let timestamp = startTime + (rcmTrack.stShift || 0);
 		let {chNo, portNo, midiCh} = rcmTrack;
@@ -1358,17 +1394,11 @@ export function convertRcmToSeq(rcm, options) {
 				case EVENT.UserPrg:
 					if (chNo >= 0) {
 						if (validateRange((0 <= gt && gt < 192), `Invalid PROGRAM (User Program) event: [${hexStr(event)}]`)) {
-							// Inserts a SysEx to set Patch Memory if necessary.
-							const progNo = gt & 0x7f;
-							if (patchNos[progNo] !== gt && rcm.header.patches) {
-								const addr = progNo * 8;
-								const bytes = [0x41, 0x10, 0x16, 0x12, 0x83, 0x05, (addr >> 7) & 0x7f, addr & 0x7f, ...rcm.header.patches[gt], 0x84];
-								console.assert(bytes.length === 17);
-								setEvent(smfTrack, timestamp, convertSysEx(bytes, 0, 0, 0));
-								patchNos[progNo] = gt;
+							// Without MTD, a user program selects the patch of the same number.
+							const patchNo = (gt < 128) ? gt : (rcm.header.patches) ? userPatchNos.get(gt) : gt & 0x7f;
+							if (patchNo !== undefined) {
+								setEvent(smfTrack, timestamp, [0xc0 | chNo, patchNo]);
 							}
-
-							setEvent(smfTrack, timestamp, [0xc0 | chNo, progNo]);
 						}
 					}
 					break;
