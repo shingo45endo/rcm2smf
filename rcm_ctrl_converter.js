@@ -82,14 +82,6 @@ export const [convertMtdToSysEx, convertCm6ToSysEx] = ['MTD', 'CM6'].map((kind) 
 			sysExs.push(makeSysExMTCM(buf.slice(index, index + 0x8 * 16), 0x05, i, 0x00));
 		}
 
-		// User Patch (Only for MTD)
-		if (pos.la.UserPatch) {
-			for (let i = 0; i < 4; i++) {
-				const index = pos.la.UserPatch + i * 0x8 * 16;
-				sysExs.push(makeSysExMTCM(buf.slice(index, index + 0x8 * 16), 0x05, i, 0x00));
-			}
-		}
-
 		// [PCM SOUND PART]
 		if (pos.pcm) {
 			// Patch Temporary Area

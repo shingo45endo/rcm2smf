@@ -254,25 +254,9 @@ export async function parseRcm(buf, controlFileReader, options) {
 		rcm.header[keyData]  = buf;
 		rcm.header[keySysEx] = sysExs;
 
-		// Gets Patch Memory information for user patches.
+		// Gets Patch Memory (#1-#128) and user patches (#129-#192).
 		if (kind === 'MTD') {
-			const patches = sysExs.filter((e) => {
-				// Extracts SysExs regarding Patch Memory. (#1-#128)
-				console.assert(e[0] === 0xf0 && e[1] === 0x41 && e[2] === 0x10 && e[3] === 0x16 && e[4] === 0x12);
-				return (e[5] === 0x05);	// Address '05 xx xx' is for Patch Memory
-			}).reduce((p, c) => {
-				// Splits payloads of SysExs by 8-byte.
-				console.assert(c.length > 5 + 3 + 2);
-				for (let i = 5 + 3; i < c.length; i += 8) {
-					const e = c.slice(i, i + 8);
-					if (e.length === 8) {
-						p.push(e);
-					}
-				}
-				return p;
-			}, []);
-			console.assert(patches.length === 192);
-			rcm.header.patches = patches;
+			rcm.header.patches = [...Array(192).keys()].map((i) => [...buf.slice(0x09e0 + i * 8, 0x09e0 + (i + 1) * 8)]);
 		}
 	}
 
@@ -1172,18 +1156,8 @@ export function convertRcmToSeq(rcm, options) {
 			}
 		}
 		if (rcm.header.sysExsMTD) {
-			// Removes redundant SysEx. (For User Patch)
-			const keys = new Set();
-			const newSysExs = rcm.header.sysExsMTD.reduce((p, c) => {
-				const key = c.slice(5, 8).map((e) => `${e}`).join(',');
-				if (!keys.has(key)) {
-					p.push(c);
-					keys.add(key);
-				}
-				return p;
-			}, []);
 			// Adds SysEx from MTD file.
-			allSysExs.push(...newSysExs);
+			allSysExs.push(...rcm.header.sysExsMTD);
 		} else if (rcm.header.sysExsCM6) {
 			// Adds SysEx from CM6 file.
 			allSysExs.push(...rcm.header.sysExsCM6);
