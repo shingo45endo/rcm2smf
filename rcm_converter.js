@@ -1654,7 +1654,8 @@ export function convertRcmToSeq(rcm, options) {
 						continue;
 					}
 
-					if (isNoteOff(noteGt, st)) {
+					// At the end of the track, all the notes are turned off. For MCP, isNoteOff() is false for the longest one.
+					if (isNoteOff(noteGt, st) || cmd === EVENT.TrackEnd) {
 						setEvent(smfTrack, timestamp + noteGt, makeNoteOff(chNo, noteNo));
 						noteGts[noteNo] = -1;
 					} else {
