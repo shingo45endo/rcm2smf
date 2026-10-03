@@ -1667,6 +1667,18 @@ export function convertRcmToSeq(rcm, options) {
 			timestamp += st;
 		}
 
+		// Turns off the notes left on if the track has no End of Track event.
+		if (chNo >= 0) {
+			const maxGt = Math.max(...noteGts, 0);
+			for (let noteNo = 0; noteNo < noteGts.length; noteNo++) {
+				if (noteGts[noteNo] >= 0) {
+					setEvent(smfTrack, timestamp + noteGts[noteNo], makeNoteOff(chNo, noteNo));
+					noteGts[noteNo] = -1;
+				}
+			}
+			timestamp += maxGt;
+		}
+
 		// End of Track
 		setEvent(smfTrack, timestamp, [0xff, 0x2f, 0x00]);
 		if (timestamp > maxDuration) {
