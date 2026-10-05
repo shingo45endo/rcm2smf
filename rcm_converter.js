@@ -1217,36 +1217,39 @@ export function convertRcmToSeq(rcm, options) {
 	// Adds Time Signature meta events from each measure's step time.
 	if (settings.metaTimeSignature) {
 		const stMeasures = getMeasureSt(rcm);
-		const maxMeasureSt = Math.max(seq.timeBase * initialBeat.numer * 2 / initialBeat.denom, 192 * 2);
 		const maxDenom = 16;
-		const minBeatSt = seq.timeBase * 4 / maxDenom;
-		if (stMeasures.every((st) => st <= maxMeasureSt) && stMeasures.every((st) => st % minBeatSt === 0)) {
-			// Makes each measure's time signature.
-			const beats = stMeasures.map((st) => {
-				for (let denom = initialBeat.denom; denom <= maxDenom; denom *= 2) {
-					const beatSt = seq.timeBase * 4 / denom;
-					const numer = st / beatSt;
-					if (Number.isInteger(numer)) {
-						return {numer, denom};
-					}
-				}
-				console.assert(false);
-				return null;
-			});
-			const dedupedBeats = beats.map((e, i, a) => {
-				const p = (i > 0) ? a[i - 1] : initialBeat;
-				return (e.numer === p.numer && e.denom === p.denom) ? null : e;
-			});
-
-			// Adds Time Signature meta events.
-			let timestamp = 0;
-			console.assert(stMeasures.length === dedupedBeats.length);
-			for (let i = 0; i < stMeasures.length; i++) {
-				if (dedupedBeats[i]) {
-					setEvent(conductorTrack, startTime + timestamp, makeMetaTimeSignature(dedupedBeats[i].numer, dedupedBeats[i].denom));
-				}
-				timestamp += stMeasures[i];
+		const stInitialMeasure = seq.timeBase * 4 * initialBeat.numer / initialBeat.denom;
+		const getBeat = (st) => {
+			// A measure as long as 2 measures of the header's time signature or longer is taken as a run of them,
+			// as it comes from missing measure lines or a loop, not from a meter like 8/4.
+			if (st >= stInitialMeasure * 2) {
+				return (st % stInitialMeasure === 0) ? initialBeat : null;
 			}
+			for (let denom = initialBeat.denom; denom <= maxDenom; denom *= 2) {
+				const numer = st / (seq.timeBase * 4 / denom);
+				if (Number.isInteger(numer) && numer <= 0xff) {
+					return {numer, denom};
+				}
+			}
+			return null;
+		};
+
+		// Adds a Time Signature meta event at each measure whose time signature differs from the previous one.
+		// A measure which cannot be a time signature is skipped, and the next measure writes its time signature again.
+		// The last measure is left out, as it is often the remainder at the end of the song.
+		let timestamp = 0;
+		let lastBeat = initialBeat;
+		let isSkipped = false;
+		for (const st of stMeasures.slice(0, -1)) {
+			const beat = getBeat(st);
+			if (!beat) {
+				isSkipped = true;
+			} else if (beat.numer !== lastBeat.numer || beat.denom !== lastBeat.denom || isSkipped) {
+				setEvent(conductorTrack, startTime + timestamp, makeMetaTimeSignature(beat.numer, beat.denom));
+				lastBeat = beat;
+				isSkipped = false;
+			}
+			timestamp += st;
 		}
 	}
 
