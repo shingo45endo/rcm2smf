@@ -1000,7 +1000,11 @@ function getMeasureSt(rcm) {
 	console.assert(EVENT_RCP.TrackEnd === EVENT_MCP.TrackEnd);
 
 	// Extracts all events and calculates step time of every measure.
-	const allStMeasures = rcm.tracks.filter((track) => track.extractedEvents).map((track) => {
+	// Muted, OFF and empty tracks are left out, but an OFF track with tempo changes (a conductor track) is used.
+	const EVENT = (rcm.header.isMCP) ? EVENT_MCP : EVENT_RCP;
+	const isUsedTrack = (track) => (track.extractedEvents && track.extractedEvents.length > 1 && (track.mode & 0x01) === 0 &&
+		(track.midiCh >= 0 || track.extractedEvents.some((e) => e[0] === EVENT.TEMPO)));
+	const allStMeasures = rcm.tracks.filter(isUsedTrack).map((track) => {
 		const stMeasures = [];
 		let st = 0;
 		for (const event of track.extractedEvents) {
