@@ -1025,6 +1025,7 @@ function getMeasureSt(rcm) {
 	// It compares the times, not the measure numbers, so that a track which misses a line can join the vote again
 	// when it has a line at a chosen time.
 	const wholeStMeasures = [];
+	const maxVoteNums = [];
 	const nextIndexes = allLineTimes.map(() => 0);
 	let time = 0;
 	let voterNos = allLineTimes.map((_, i) => i);
@@ -1049,8 +1050,16 @@ function getMeasureSt(rcm) {
 		const maxVoteNum = Math.max(...votes.values());
 		const nextTime = Math.min(...[...votes.entries()].filter(([_, voteNum]) => voteNum === maxVoteNum).map(([lineTime]) => lineTime));
 		wholeStMeasures.push(nextTime - time);
+		maxVoteNums.push(maxVoteNum);
 		voterNos = allLineTimeSets.map((_, i) => i).filter((i) => allLineTimeSets[i].has(nextTime));
 		time = nextTime;
+	}
+
+	// If half or more of the measures are chosen by a single vote, the measure lines are not reliable.
+	// This happens when the measure lines of each track are a little off from the others. The last measure is not counted.
+	const singleVoteNum = maxVoteNums.slice(0, -1).filter((e) => e <= 1).length;
+	if (allLineTimes.length >= 2 && singleVoteNum > 0 && singleVoteNum * 2 >= maxVoteNums.length - 1) {
+		return [];
 	}
 
 	return wholeStMeasures;
