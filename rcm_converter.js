@@ -1004,57 +1004,53 @@ function getMeasureSt(rcm) {
 	const EVENT = (rcm.header.isMCP) ? EVENT_MCP : EVENT_RCP;
 	const isUsedTrack = (track) => (track.extractedEvents && track.extractedEvents.length > 1 && (track.mode & 0x01) === 0 &&
 		(track.midiCh >= 0 || track.extractedEvents.some((e) => e[0] === EVENT.TEMPO)));
-	const allStMeasures = rcm.tracks.filter(isUsedTrack).map((track) => {
-		const stMeasures = [];
-		let st = 0;
+	const allLineTimes = rcm.tracks.filter(isUsedTrack).map((track) => {
+		const lineTimes = [];
+		let time = 0;
 		for (const event of track.extractedEvents) {
 			if (event[0] < 0xf5) {
-				st += event[1];
+				time += event[1];
 			} else if (event[0] === EVENT_RCP.MeasEnd || event[0] === EVENT_RCP.TrackEnd) {
-				if (st > 0) {
-					stMeasures.push(st);
-					st = 0;
+				// A measure of length 0 makes no measure line.
+				if (time > ((lineTimes.length > 0) ? lineTimes[lineTimes.length - 1] : 0)) {
+					lineTimes.push(time);
 				}
 			}
 		}
-		return stMeasures;
+		return lineTimes;
 	});
+	const allLineTimeSets = allLineTimes.map((e) => new Set(e));
 
-	// Chooses the most "common" step times of each measure from all the tracks.
-	const maxMeasureNo = Math.max(...allStMeasures.map((e) => e.length));
+	// Chooses each measure line by "majority vote" of the tracks which have a line at the previous one.
+	// It compares the times, not the measure numbers, so that a track which misses a line can join the vote again
+	// when it has a line at a chosen time.
 	const wholeStMeasures = [];
-	let survivors = new Set([...new Array(allStMeasures.length)].map((_, i) => i));
-	for (let measureNo = 0; measureNo < maxMeasureNo; measureNo++) {
-		// Gets each track's step time in the current measure.
-		const map = new Map();
-		for (let trackNo = 0; trackNo < allStMeasures.length; trackNo++) {
-			if (!survivors.has(trackNo)) {
-				continue;
+	const nextIndexes = allLineTimes.map(() => 0);
+	let time = 0;
+	let voterNos = allLineTimes.map((_, i) => i);
+	for (;;) {
+		// Gets the time of the next measure line which each voter proposes.
+		const votes = new Map();
+		for (const voterNo of voterNos) {
+			const lineTimes = allLineTimes[voterNo];
+			while (nextIndexes[voterNo] < lineTimes.length && lineTimes[nextIndexes[voterNo]] <= time) {
+				nextIndexes[voterNo]++;
 			}
-			if (measureNo >= allStMeasures[trackNo].length) {
-				survivors.delete(trackNo);
-				continue;
-			}
-
-			const st = allStMeasures[trackNo][measureNo];
-			if (map.has(st)) {
-				console.assert(Array.isArray(map.get(st)));
-				map.get(st).push(trackNo);
-			} else {
-				map.set(st, [trackNo]);
+			if (nextIndexes[voterNo] < lineTimes.length) {
+				const nextTime = lineTimes[nextIndexes[voterNo]];
+				votes.set(nextTime, (votes.get(nextTime) || 0) + 1);
 			}
 		}
-
-		if (survivors.size === 0) {
+		if (votes.size === 0) {
 			break;
 		}
 
-		// Chooses this measure's step time by "majority vote".
-		const entries = [...map.entries()];
-		const matchNum = Math.max(...entries.map(([_, trackNos]) => trackNos.length));
-		const [st, trackNos] = entries.find(([_, trackNos]) => trackNos.length === matchNum);
-		wholeStMeasures.push(st);
-		survivors = new Set(trackNos);
+		// Chooses the time which most voters propose. If tied, the earliest one.
+		const maxVoteNum = Math.max(...votes.values());
+		const nextTime = Math.min(...[...votes.entries()].filter(([_, voteNum]) => voteNum === maxVoteNum).map(([lineTime]) => lineTime));
+		wholeStMeasures.push(nextTime - time);
+		voterNos = allLineTimeSets.map((_, i) => i).filter((i) => allLineTimeSets[i].has(nextTime));
+		time = nextTime;
 	}
 
 	return wholeStMeasures;
