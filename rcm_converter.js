@@ -994,7 +994,7 @@ function spaceEachSysEx(sysExs, maxTick, timeBase, isOldMt32) {
 	}
 }
 
-function getMeasureSt(rcm) {
+function guessStMeasures(rcm) {
 	console.assert(rcm);
 	console.assert(EVENT_RCP.MeasEnd  === EVENT_MCP.MeasEnd);
 	console.assert(EVENT_RCP.TrackEnd === EVENT_MCP.TrackEnd);
@@ -1024,7 +1024,7 @@ function getMeasureSt(rcm) {
 	// Chooses each measure line by "majority vote" of the tracks which have a line at the previous one.
 	// It compares the times, not the measure numbers, so that a track which misses a line can join the vote again
 	// when it has a line at a chosen time.
-	const wholeStMeasures = [];
+	const stMeasures = [];
 	const maxVoteNums = [];
 	const nextIndexes = allLineTimes.map(() => 0);
 	let time = 0;
@@ -1049,7 +1049,7 @@ function getMeasureSt(rcm) {
 		// Chooses the time which most voters propose. If tied, the earliest one.
 		const maxVoteNum = Math.max(...votes.values());
 		const nextTime = Math.min(...[...votes.entries()].filter(([_, voteNum]) => voteNum === maxVoteNum).map(([lineTime]) => lineTime));
-		wholeStMeasures.push(nextTime - time);
+		stMeasures.push(nextTime - time);
 		maxVoteNums.push(maxVoteNum);
 		voterNos = allLineTimeSets.map((_, i) => i).filter((i) => allLineTimeSets[i].has(nextTime));
 		time = nextTime;
@@ -1062,7 +1062,7 @@ function getMeasureSt(rcm) {
 		return [];
 	}
 
-	return wholeStMeasures;
+	return stMeasures;
 }
 
 export function convertRcmToSeq(rcm, options) {
@@ -1225,17 +1225,17 @@ export function convertRcmToSeq(rcm, options) {
 
 	// Adds Time Signature meta events from each measure's step time.
 	if (settings.metaTimeSignature) {
-		const stMeasures = getMeasureSt(rcm);
+		const guessedStMeasures = guessStMeasures(rcm);
 		const maxDenom = 16;
 		const stInitialMeasure = seq.timeBase * 4 * initialBeat.numer / initialBeat.denom;
-		const getBeat = (st) => {
+		const getBeat = (stMeasure) => {
 			// A measure as long as 2 measures of the header's time signature or longer is taken as a run of them,
 			// as it comes from missing measure lines or a loop, not from a meter like 8/4.
-			if (st >= stInitialMeasure * 2) {
-				return (st % stInitialMeasure === 0) ? initialBeat : null;
+			if (stMeasure >= stInitialMeasure * 2) {
+				return (stMeasure % stInitialMeasure === 0) ? initialBeat : null;
 			}
 			for (let denom = initialBeat.denom; denom <= maxDenom; denom *= 2) {
-				const numer = st / (seq.timeBase * 4 / denom);
+				const numer = stMeasure / (seq.timeBase * 4 / denom);
 				if (Number.isInteger(numer) && numer <= 0xff) {
 					return {numer, denom};
 				}
@@ -1249,8 +1249,8 @@ export function convertRcmToSeq(rcm, options) {
 		let timestamp = 0;
 		let lastBeat = initialBeat;
 		let isSkipped = false;
-		for (const st of stMeasures.slice(0, -1)) {
-			const beat = getBeat(st);
+		for (const stMeasure of guessedStMeasures.slice(0, -1)) {
+			const beat = getBeat(stMeasure);
 			if (!beat) {
 				isSkipped = true;
 			} else if (beat.numer !== lastBeat.numer || beat.denom !== lastBeat.denom || isSkipped) {
@@ -1258,7 +1258,7 @@ export function convertRcmToSeq(rcm, options) {
 				lastBeat = beat;
 				isSkipped = false;
 			}
-			timestamp += st;
+			timestamp += stMeasure;
 		}
 	}
 
