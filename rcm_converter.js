@@ -994,66 +994,75 @@ function spaceEachSysEx(sysExs, maxTick, timeBase, isOldMt32) {
 	}
 }
 
-function getMeasureSt(rcm) {
+function guessStMeasures(rcm) {
 	console.assert(rcm);
 	console.assert(EVENT_RCP.MeasEnd  === EVENT_MCP.MeasEnd);
 	console.assert(EVENT_RCP.TrackEnd === EVENT_MCP.TrackEnd);
 
 	// Extracts all events and calculates step time of every measure.
-	const allStMeasures = rcm.tracks.filter((track) => track.extractedEvents).map((track) => {
-		const stMeasures = [];
-		let st = 0;
+	// Muted, OFF and empty tracks are left out, but an OFF track with tempo changes (a conductor track) is used.
+	const EVENT = (rcm.header.isMCP) ? EVENT_MCP : EVENT_RCP;
+	const isUsedTrack = (track) => (track.extractedEvents && track.extractedEvents.length > 1 && (track.mode & 0x01) === 0 &&
+		(track.midiCh >= 0 || track.extractedEvents.some((e) => e[0] === EVENT.TEMPO)));
+	const allLineTimes = rcm.tracks.filter(isUsedTrack).map((track) => {
+		const lineTimes = [];
+		let time = 0;
 		for (const event of track.extractedEvents) {
 			if (event[0] < 0xf5) {
-				st += event[1];
+				time += event[1];
 			} else if (event[0] === EVENT_RCP.MeasEnd || event[0] === EVENT_RCP.TrackEnd) {
-				if (st > 0) {
-					stMeasures.push(st);
-					st = 0;
+				// A measure of length 0 makes no measure line.
+				if (time > ((lineTimes.length > 0) ? lineTimes[lineTimes.length - 1] : 0)) {
+					lineTimes.push(time);
 				}
 			}
 		}
-		return stMeasures;
+		return lineTimes;
 	});
+	const allLineTimeSets = allLineTimes.map((e) => new Set(e));
 
-	// Chooses the most "common" step times of each measure from all the tracks.
-	const maxMeasureNo = Math.max(...allStMeasures.map((e) => e.length));
-	const wholeStMeasures = [];
-	let survivors = new Set([...new Array(allStMeasures.length)].map((_, i) => i));
-	for (let measureNo = 0; measureNo < maxMeasureNo; measureNo++) {
-		// Gets each track's step time in the current measure.
-		const map = new Map();
-		for (let trackNo = 0; trackNo < allStMeasures.length; trackNo++) {
-			if (!survivors.has(trackNo)) {
-				continue;
+	// Chooses each measure line by "majority vote" of the tracks which have a line at the previous one.
+	// It compares the times, not the measure numbers, so that a track which misses a line can join the vote again
+	// when it has a line at a chosen time.
+	const stMeasures = [];
+	const maxVoteNums = [];
+	const nextIndexes = allLineTimes.map(() => 0);
+	let time = 0;
+	let voterNos = allLineTimes.map((_, i) => i);
+	for (;;) {
+		// Gets the time of the next measure line which each voter proposes.
+		const votes = new Map();
+		for (const voterNo of voterNos) {
+			const lineTimes = allLineTimes[voterNo];
+			while (nextIndexes[voterNo] < lineTimes.length && lineTimes[nextIndexes[voterNo]] <= time) {
+				nextIndexes[voterNo]++;
 			}
-			if (measureNo >= allStMeasures[trackNo].length) {
-				survivors.delete(trackNo);
-				continue;
-			}
-
-			const st = allStMeasures[trackNo][measureNo];
-			if (map.has(st)) {
-				console.assert(Array.isArray(map.get(st)));
-				map.get(st).push(trackNo);
-			} else {
-				map.set(st, [trackNo]);
+			if (nextIndexes[voterNo] < lineTimes.length) {
+				const nextTime = lineTimes[nextIndexes[voterNo]];
+				votes.set(nextTime, (votes.get(nextTime) || 0) + 1);
 			}
 		}
-
-		if (survivors.size === 0) {
+		if (votes.size === 0) {
 			break;
 		}
 
-		// Chooses this measure's step time by "majority vote".
-		const entries = [...map.entries()];
-		const matchNum = Math.max(...entries.map(([_, trackNos]) => trackNos.length));
-		const [st, trackNos] = entries.find(([_, trackNos]) => trackNos.length === matchNum);
-		wholeStMeasures.push(st);
-		survivors = new Set(trackNos);
+		// Chooses the time which most voters propose. If tied, the earliest one.
+		const maxVoteNum = Math.max(...votes.values());
+		const nextTime = Math.min(...[...votes.entries()].filter(([_, voteNum]) => voteNum === maxVoteNum).map(([lineTime]) => lineTime));
+		stMeasures.push(nextTime - time);
+		maxVoteNums.push(maxVoteNum);
+		voterNos = allLineTimeSets.map((_, i) => i).filter((i) => allLineTimeSets[i].has(nextTime));
+		time = nextTime;
 	}
 
-	return wholeStMeasures;
+	// If half or more of the measures are chosen by a single vote, the measure lines are not reliable.
+	// This happens when the measure lines of each track are a little off from the others. The last measure is not counted.
+	const singleVoteNum = maxVoteNums.slice(0, -1).filter((e) => e <= 1).length;
+	if (allLineTimes.length >= 2 && singleVoteNum > 0 && singleVoteNum * 2 >= maxVoteNums.length - 1) {
+		return [];
+	}
+
+	return stMeasures;
 }
 
 export function convertRcmToSeq(rcm, options) {
@@ -1216,37 +1225,40 @@ export function convertRcmToSeq(rcm, options) {
 
 	// Adds Time Signature meta events from each measure's step time.
 	if (settings.metaTimeSignature) {
-		const stMeasures = getMeasureSt(rcm);
-		const maxMeasureSt = Math.max(seq.timeBase * initialBeat.numer * 2 / initialBeat.denom, 192 * 2);
+		const guessedStMeasures = guessStMeasures(rcm);
 		const maxDenom = 16;
-		const minBeatSt = seq.timeBase * 4 / maxDenom;
-		if (stMeasures.every((st) => st <= maxMeasureSt) && stMeasures.every((st) => st % minBeatSt === 0)) {
-			// Makes each measure's time signature.
-			const beats = stMeasures.map((st) => {
-				for (let denom = initialBeat.denom; denom <= maxDenom; denom *= 2) {
-					const beatSt = seq.timeBase * 4 / denom;
-					const numer = st / beatSt;
-					if (Number.isInteger(numer)) {
-						return {numer, denom};
-					}
-				}
-				console.assert(false);
-				return null;
-			});
-			const dedupedBeats = beats.map((e, i, a) => {
-				const p = (i > 0) ? a[i - 1] : initialBeat;
-				return (e.numer === p.numer && e.denom === p.denom) ? null : e;
-			});
-
-			// Adds Time Signature meta events.
-			let timestamp = 0;
-			console.assert(stMeasures.length === dedupedBeats.length);
-			for (let i = 0; i < stMeasures.length; i++) {
-				if (dedupedBeats[i]) {
-					setEvent(conductorTrack, startTime + timestamp, makeMetaTimeSignature(dedupedBeats[i].numer, dedupedBeats[i].denom));
-				}
-				timestamp += stMeasures[i];
+		const stInitialMeasure = seq.timeBase * 4 * initialBeat.numer / initialBeat.denom;
+		const getBeat = (stMeasure) => {
+			// A measure as long as 2 measures of the header's time signature or longer is taken as a run of them,
+			// as it comes from missing measure lines or a loop, not from a meter like 8/4.
+			if (stMeasure >= stInitialMeasure * 2) {
+				return (stMeasure % stInitialMeasure === 0) ? initialBeat : null;
 			}
+			for (let denom = initialBeat.denom; denom <= maxDenom; denom *= 2) {
+				const numer = stMeasure / (seq.timeBase * 4 / denom);
+				if (Number.isInteger(numer) && numer <= 0xff) {
+					return {numer, denom};
+				}
+			}
+			return null;
+		};
+
+		// Adds a Time Signature meta event at each measure whose time signature differs from the previous one.
+		// A measure which cannot be a time signature is skipped, and the next measure writes its time signature again.
+		// The last measure is left out, as it is often the remainder at the end of the song.
+		let timestamp = 0;
+		let lastBeat = initialBeat;
+		let isSkipped = false;
+		for (const stMeasure of guessedStMeasures.slice(0, -1)) {
+			const beat = getBeat(stMeasure);
+			if (!beat) {
+				isSkipped = true;
+			} else if (beat.numer !== lastBeat.numer || beat.denom !== lastBeat.denom || isSkipped) {
+				setEvent(conductorTrack, startTime + timestamp, makeMetaTimeSignature(beat.numer, beat.denom));
+				lastBeat = beat;
+				isSkipped = false;
+			}
+			timestamp += stMeasure;
 		}
 	}
 
