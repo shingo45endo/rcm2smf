@@ -1,8 +1,8 @@
-import fs from 'fs';
-import path from 'path';
-import process from 'process';
-import util from 'util';
-import assert from 'assert';
+import fs from 'node:fs';
+import path from 'node:path';
+import process from 'node:process';
+import util from 'node:util';
+import assert from 'node:assert';
 
 import {convertMtdToSysEx, convertCm6ToSysEx, convertGsdToSysEx, isSysExRedundant} from './rcm_ctrl_converter.js';
 
