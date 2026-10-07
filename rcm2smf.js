@@ -117,12 +117,12 @@ const options = {
 	},
 	'roland-base-addr-h': {
 		group: 'RCM Parsing',
-		describe: 'Initial value of Initial value of the base address (H) for RolBase',
+		describe: 'Initial value of the base address (H) for RolBase',
 		range: [0, 127],
 	},
 	'roland-base-addr-m': {
 		group: 'RCM Parsing',
-		describe: 'Initial value of Initial value of the base address (M) for RolBase',
+		describe: 'Initial value of the base address (M) for RolBase',
 		range: [0, 127],
 	},
 	'yamaha-dev-id': {
@@ -137,12 +137,12 @@ const options = {
 	},
 	'yamaha-base-addr-h': {
 		group: 'RCM Parsing',
-		describe: 'Initial value of Initial value of the base address (H) for YamBase',
+		describe: 'Initial value of the base address (H) for YamBase',
 		range: [0, 127],
 	},
 	'yamaha-base-addr-m': {
 		group: 'RCM Parsing',
-		describe: 'Initial value of Initial value of the base address (M) for YamBase',
+		describe: 'Initial value of the base address (M) for YamBase',
 		range: [0, 127],
 	},
 
@@ -207,7 +207,7 @@ try {
 		if (option.type === 'number') {
 			value = (String(value).trim() === '') ? NaN : Number(value);
 			if (!Number.isInteger(value)) {
-				throw new Error(`${key} must be a positive integer number.`);
+				throw new Error(`${key} must be an integer.`);
 			}
 			const [min, max] = option.range;
 			if (value < min || max < value) {
