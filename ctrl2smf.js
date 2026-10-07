@@ -1,42 +1,31 @@
 import fs from 'fs';
 import path from 'path';
+import process from 'process';
 import util from 'util';
 import assert from 'assert';
 
-import yargs from 'yargs';
 import {ctrl2smf} from './rcm_converter.js';
 
-// Parses argv by yargs.
-const argv = yargs.
-	strict().
-	options({
-		'reset-before-ctrl': {
-			type: 'boolean',
-			default: true,
-			describe: 'Send reset SysEx before sending control files',
-		},
-		'optimize-ctrl': {
-			type: 'boolean',
-			default: true,
-			describe: 'Optimize redundant SysEx generated from control files',
-		},
-		'debug': {
-			type: 'boolean',
-			default: false,
-			describe: 'Debug mode (Enable assertion)',
-		},
-	}).
-	demandCommand(1, "Argument 'ctrl-file' is not specified.").
-	help().
-	alias('h', 'help').
-	alias('v', 'version').
-	usage('$0 [options] ctrl-file [syx-file]').
-	wrap(Math.max(yargs.terminalWidth() - 2, 80)).
-	argv;
+// Parses argv.
+const {values, positionals} = util.parseArgs({
+	options: {
+		'reset-before-ctrl': {type: 'boolean', default: true},
+		'optimize-ctrl':     {type: 'boolean', default: true},
+		'debug':             {type: 'boolean', default: false},
+	},
+	allowPositionals: true,
+	allowNegative: true,
+});
+if (positionals.length < 1) {
+	console.error(`Usage: ${path.basename(process.argv[1])} [--no-reset-before-ctrl] [--no-optimize-ctrl] [--debug] ctrl-file [smf-file]`);
+	process.exit(1);
+}
+// ctrl2smf() takes the settings in camel case.
+const settings = {resetBeforeCtrl: values['reset-before-ctrl'], optimizeCtrl: values['optimize-ctrl'], debug: values.debug};
 
 // Gets the file names from argv.
-const ctrlFile = argv._[0];
-let   smfFile  = argv._[1];
+const ctrlFile = positionals[0];
+let   smfFile  = positionals[1];
 if (!smfFile) {
 	// If the destination file name is not specify, makes it from the source file name.
 	const p = path.parse(ctrlFile);
@@ -46,7 +35,7 @@ if (!smfFile) {
 	smfFile = path.format(p);
 }
 
-console.assert = (argv.debug) ? assert : () => {/* EMPTY */};
+console.assert = (settings.debug) ? assert : () => {/* EMPTY */};
 
 const readFileAsync  = util.promisify(fs.readFile);
 const writeFileAsync = util.promisify(fs.writeFile);
@@ -55,9 +44,9 @@ const writeFileAsync = util.promisify(fs.writeFile);
 (async () => {
 	try {
 		const ctrlData = await readFileAsync(ctrlFile);
-		const smfData  = await ctrl2smf(new Uint8Array(ctrlData), path.basename(ctrlFile), argv);
+		const smfData  = await ctrl2smf(new Uint8Array(ctrlData), path.basename(ctrlFile), settings);
 		await writeFileAsync(smfFile, smfData);
 	} catch (e) {
-		console.error((argv.debug) ? e : `${e}`);
+		console.error((settings.debug) ? e : `${e}`);
 	}
 })();

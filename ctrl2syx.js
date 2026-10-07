@@ -1,37 +1,28 @@
 import fs from 'fs';
 import path from 'path';
+import process from 'process';
 import util from 'util';
 import assert from 'assert';
 
-import yargs from 'yargs';
 import {convertMtdToSysEx, convertCm6ToSysEx, convertGsdToSysEx, isSysExRedundant} from './rcm_ctrl_converter.js';
 
-// Parses argv by yargs.
-const argv = yargs.
-	strict().
-	options({
-		'optimize-ctrl': {
-			type: 'boolean',
-			default: false,
-			describe: 'Optimize redundant SysEx generated from control files',
-		},
-		'debug': {
-			type: 'boolean',
-			default: false,
-			describe: 'Debug mode (Enable assertion)',
-		},
-	}).
-	demandCommand(1, "Argument 'ctrl-file' is not specified.").
-	help().
-	alias('h', 'help').
-	alias('v', 'version').
-	usage('$0 [options] ctrl-file [syx-file]').
-	wrap(Math.max(yargs.terminalWidth() - 2, 80)).
-	argv;
+// Parses argv.
+const {values, positionals} = util.parseArgs({
+	options: {
+		'optimize-ctrl': {type: 'boolean', default: false},
+		'debug':         {type: 'boolean', default: false},
+	},
+	allowPositionals: true,
+	allowNegative: true,
+});
+if (positionals.length < 1) {
+	console.error(`Usage: ${path.basename(process.argv[1])} [--optimize-ctrl] [--debug] ctrl-file [syx-file]`);
+	process.exit(1);
+}
 
 // Gets the file names from argv.
-const ctrlFile = argv._[0];
-let   syxFile  = argv._[1];
+const ctrlFile = positionals[0];
+let   syxFile  = positionals[1];
 if (!syxFile) {
 	// If the destination file name is not specify, makes it from the source file name.
 	const p = path.parse(ctrlFile);
@@ -41,7 +32,7 @@ if (!syxFile) {
 	syxFile = path.format(p);
 }
 
-console.assert = (argv.debug) ? assert : () => {/* EMPTY */};
+console.assert = (values.debug) ? assert : () => {/* EMPTY */};
 
 const readFileAsync  = util.promisify(fs.readFile);
 const writeFileAsync = util.promisify(fs.writeFile);
@@ -51,10 +42,10 @@ const writeFileAsync = util.promisify(fs.writeFile);
 	try {
 		const bytes = new Uint8Array(await readFileAsync(ctrlFile));
 		const allSysExs = convertCm6ToSysEx(bytes) || convertMtdToSysEx(bytes) || convertGsdToSysEx(bytes);
-		const sysExs = (argv.optimizeCtrl) ? allSysExs.filter((e) => !isSysExRedundant(e)) : allSysExs;
+		const sysExs = (values['optimize-ctrl']) ? allSysExs.filter((e) => !isSysExRedundant(e)) : allSysExs;
 
 		await writeFileAsync(syxFile, new Uint8Array([].concat(...sysExs)));
 	} catch (e) {
-		console.error((argv.debug) ? e : `${e}`);
+		console.error((values.debug) ? e : `${e}`);
 	}
 })();

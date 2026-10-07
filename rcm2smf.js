@@ -1,116 +1,169 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import process from 'node:process';
 import util from 'node:util';
 import assert from 'node:assert';
-
-import yargs from 'yargs';
 
 import {rcm2smf, defaultSettings} from './rcm_converter.js';
 import {decodeNec932} from './nec932_decoder.js';
 
-// Options for yargs.
+// Options. Only "type" and "short" are passed to util.parseArgs, and the others are for checking values and the help.
 const options = {
-	// Common
-	'debug': {
-		type: 'boolean',
-		default: false,
-		describe: 'Debug mode (Enable assertion)',
-	},
-
 	// About SMF generation
 	'meta-text-memo': {
+		group: 'SMF Generation',
 		describe: 'Generate SMF Text events for RCM memo area',
 	},
 	'meta-text-comment': {
+		group: 'SMF Generation',
 		describe: 'Generate SMF Text events for RCM Comment events',
 	},
 	'meta-text-usr-exc': {
+		group: 'SMF Generation',
 		describe: 'Generate SMF Text events for each RCM UsrExc events',
 	},
 	'meta-cue': {
+		group: 'SMF Generation',
 		describe: 'Generate SMF Cue Point events for RCM KeyScan and External Command event',
 	},
 	'meta-time-signature': {
+		group: 'SMF Generation',
 		describe: 'Generate SMF Time Signature events from each measure\'s step time',
 	},
 	'trim-track-name': {
+		group: 'SMF Generation',
 		describe: 'Remove whitespace from SMF Sequence/Track Name events',
 		choices: ['none', 'left', 'right', 'both'],
 	},
 	'trim-text-memo': {
+		group: 'SMF Generation',
 		describe: 'Remove whitespace from SMF Text events for RCM memo area',
 		choices: ['none', 'left', 'right', 'both'],
 	},
 	'trim-text-comment': {
+		group: 'SMF Generation',
 		describe: 'Remove whitespace from SMF Text events for RCM Comment events',
 		choices: ['none', 'left', 'right', 'both'],
 	},
 	'trim-text-usr-exc': {
+		group: 'SMF Generation',
 		describe: 'Remove whitespace from SMF Text events for RCM UsrExc events',
 		choices: ['none', 'left', 'right', 'both'],
 	},
 	'note-off': {
+		group: 'SMF Generation',
 		describe: 'Use note-off ("8nH kk uu") events instead of "9nH kk 00H"',
 	},
 	'note-off-vel': {
+		group: 'SMF Generation',
 		describe: 'Velocity of note-off ("8nH kk uu") events',
+		range: [0, 127],
 	},
 
 	// About RCM parsing
 	'st-plus': {
+		group: 'RCM Parsing',
 		describe: 'Assume ST+ as signed (>= RCM 2.5) or unsigned (<= RCM 2.3a)',
 		choices: ['auto', 'signed', 'unsigned'],
 	},
 	'reset-before-ctrl': {
+		group: 'RCM Parsing',
 		describe: 'Send reset SysEx before sending control files',
 	},
 	'optimize-ctrl': {
+		group: 'RCM Parsing',
 		describe: 'Optimize redundant SysEx generated from control files',
 	},
 	'extra-sysex-wait': {
+		group: 'RCM Parsing',
 		describe: 'Wait for extra time after each SysEx in control files (for MT-32 Ver.1.xx)',
 	},
 	'ignore-ctrl-file': {
+		group: 'RCM Parsing',
 		describe: 'Ignore control files',
 	},
 	'ignore-out-of-range': {
+		group: 'RCM Parsing',
 		describe: 'Ignore out-of-range values in events',
 	},
 	'ignore-wrong-event': {
+		group: 'RCM Parsing',
 		describe: 'Ignore unexpected events',
 	},
 	'max-loop-nest': {
+		group: 'RCM Parsing',
 		describe: 'Maximum loop nest level',
+		range: [0, 100],
 	},
 	'infinity-loop-count': {
+		group: 'RCM Parsing',
 		describe: 'Loop count to revise to avoid loop-bomb',
+		range: [1, 255],
 	},
 	'loop-bomb-threshold': {
+		group: 'RCM Parsing',
 		describe: 'Number of extracted beats considered as loop-bomb',
+		range: [100, Infinity],
 	},
 	'roland-dev-id': {
+		group: 'RCM Parsing',
 		describe: 'Initial value of device ID for RolDev#',
+		range: [0, 127],
 	},
 	'roland-model-id': {
+		group: 'RCM Parsing',
 		describe: 'Initial value of model ID for RolDev#',
+		range: [0, 127],
 	},
 	'roland-base-addr-h': {
+		group: 'RCM Parsing',
 		describe: 'Initial value of Initial value of the base address (H) for RolBase',
+		range: [0, 127],
 	},
 	'roland-base-addr-m': {
+		group: 'RCM Parsing',
 		describe: 'Initial value of Initial value of the base address (M) for RolBase',
+		range: [0, 127],
 	},
 	'yamaha-dev-id': {
+		group: 'RCM Parsing',
 		describe: 'Initial value of device ID for YamDev#',
+		range: [0, 127],
 	},
 	'yamaha-model-id': {
+		group: 'RCM Parsing',
 		describe: 'Initial value of model ID for YamDev#',
+		range: [0, 127],
 	},
 	'yamaha-base-addr-h': {
+		group: 'RCM Parsing',
 		describe: 'Initial value of Initial value of the base address (H) for YamBase',
+		range: [0, 127],
 	},
 	'yamaha-base-addr-m': {
+		group: 'RCM Parsing',
 		describe: 'Initial value of Initial value of the base address (M) for YamBase',
+		range: [0, 127],
+	},
+
+	// Common
+	'debug': {
+		group: 'Options',
+		type: 'boolean',
+		default: false,
+		describe: 'Debug mode (Enable assertion)',
+	},
+	'help': {
+		group: 'Options',
+		type: 'boolean',
+		short: 'h',
+		describe: 'Show help',
+	},
+	'version': {
+		group: 'Options',
+		type: 'boolean',
+		short: 'v',
+		describe: 'Show version number',
 	},
 };
 
@@ -124,73 +177,86 @@ for (const key of Object.keys(defaultSettings)) {
 	});
 }
 
-// Parses argv by yargs.
-const argv = yargs.
-	strict().
-	options(options).
-	config(defaultSettings).
-	config('settings').
-	check((argv) => {
-		// Checks whether the specified numbers are valid.
-		for (const key of Object.keys(argv).filter((e) => typeof argv[e] === 'number')) {
-			if (Number.isNaN(argv[key]) || !Number.isInteger(argv[key])) {
+// Parses argv.
+let settings;
+let positionals;
+try {
+	// util.parseArgs knows only boolean and string, so numbers are given as strings.
+	const parseOptions = Object.fromEntries(Object.entries(options).map(([name, option]) => {
+		const type = (option.type === 'boolean') ? 'boolean' : 'string';
+		return [name, (option.short) ? {type, short: option.short} : {type}];
+	}));
+	let values;
+	({values, positionals} = util.parseArgs({options: parseOptions, allowPositionals: true, allowNegative: true}));
+
+	if (values.help) {
+		console.log(makeHelpText());
+		process.exit(0);
+	}
+	if (values.version) {
+		const packagePath = path.join(path.dirname(process.argv[1]), 'package.json');
+		console.log(JSON.parse(fs.readFileSync(packagePath, 'utf8')).version);
+		process.exit(0);
+	}
+
+	// Makes the settings from the specified values and the default ones, and checks them. The names are converted to camel case.
+	settings = {};
+	for (const [name, option] of Object.entries(options).filter(([name]) => name !== 'help' && name !== 'version')) {
+		const key = name.replace(/-([a-z])/ug, (_, letter) => letter.toUpperCase());
+		let value = (name in values) ? values[name] : option.default;
+		if (option.type === 'number') {
+			value = (String(value).trim() === '') ? NaN : Number(value);
+			if (!Number.isInteger(value)) {
 				throw new Error(`${key} must be a positive integer number.`);
 			}
-		}
-
-		// Checks whether the specified numbers are in range.
-		const ranges = {
-			noteOffVel:        [0, 127],
-			maxLoopNest:       [0, 100],
-			infinityLoopCount: [1, 255],
-			loopBombThreshold: [100, Infinity],
-			rolandDevId:       [0, 127],
-			rolandModelId:     [0, 127],
-			rolandBaseAddrH:   [0, 127],
-			rolandBaseAddrM:   [0, 127],
-			yamahaDevId:       [0, 127],
-			yamahaModelId:     [0, 127],
-			yamahaBaseAddrH:   [0, 127],
-			yamahaBaseAddrM:   [0, 127],
-		};
-		for (const key of Object.keys(ranges)) {
-			const [min, max] = ranges[key];
-			if (argv[key] < min || max < argv[key]) {
+			const [min, max] = option.range;
+			if (value < min || max < value) {
 				throw new Error(`${key} must be in a range of (${min} - ${max}).`);
 			}
 		}
-
-		// Initial reset SysEx cannot be omitted when optimizing SysEx generated from control files.
-		if (argv.optimizeCtrl && !argv.resetBeforeCtrl) {
-			throw new Error('In case of optimizing SysEx for control files, adding an initial reset SysEx is needed.\n(Use "--reset-before-ctrl" or "--no-optimize-ctrl")');
+		if (option.choices && !option.choices.includes(value)) {
+			throw new Error(`${key} must be one of ${option.choices.map((e) => JSON.stringify(e)).join(', ')}.`);
 		}
+		settings[key] = value;
+	}
 
-		return true;
-	}).
-	demandCommand(1, "Argument 'rcm-file' is not specified.").
-	help().
-	alias('h', 'help').
-	alias('v', 'version').
-	group([
-		'meta-text-memo', 'meta-text-comment', 'meta-text-usr-exc', 'meta-cue', 'meta-time-signature',
-		'trim-track-name', 'trim-text-memo', 'trim-text-comment', 'trim-text-usr-exc',
-		'note-off', 'note-off-vel',
-	], 'SMF Generation:').
-	group([
-		'st-plus',
-		'reset-before-ctrl', 'optimize-ctrl', 'extra-sysex-wait', 'ignore-ctrl-file',
-		'ignore-out-of-range', 'ignore-wrong-event',
-		'max-loop-nest', 'infinity-loop-count', 'loop-bomb-threshold',
-		'roland-dev-id', 'roland-model-id', 'roland-base-addr-h', 'roland-base-addr-m',
-		'yamaha-dev-id', 'yamaha-model-id', 'yamaha-base-addr-h', 'yamaha-base-addr-m',
-	], 'RCM Parsing:').
-	usage('$0 [options] rcm-file [smf-file]').
-	wrap(Math.max(yargs.terminalWidth() - 2, 80)).
-	argv;
+	// Initial reset SysEx cannot be omitted when optimizing SysEx generated from control files.
+	if (settings.optimizeCtrl && !settings.resetBeforeCtrl) {
+		throw new Error('In case of optimizing SysEx for control files, adding an initial reset SysEx is needed.\n(Use "--reset-before-ctrl" or "--no-optimize-ctrl")');
+	}
+
+	if (positionals.length < 1) {
+		throw new Error("Argument 'rcm-file' is not specified.");
+	}
+} catch (e) {
+	console.error(`${e.message}\nRun with "--help" to see the options.`);
+	process.exit(1);
+}
+
+// Makes the help from the options. The groups are in the order of their first options.
+function makeHelpText() {
+	const getLabel = (name) => ((options[name].short) ? `-${options[name].short}, --${name}` : `--${name}`);
+	const labelWidth = Math.max(...Object.keys(options).map((e) => getLabel(e).length));
+	const lines = [`${path.basename(process.argv[1])} [options] rcm-file [smf-file]`];
+	for (const groupName of new Set(Object.values(options).map((e) => e.group))) {
+		lines.push('', `${groupName}:`);
+		for (const [name, option] of Object.entries(options).filter(([_, e]) => e.group === groupName)) {
+			const notes = [`[${option.type}]`];
+			if (option.choices) {
+				notes.push(`[choices: ${option.choices.map((e) => JSON.stringify(e)).join(', ')}]`);
+			}
+			if ('default' in option) {
+				notes.push(`[default: ${JSON.stringify(option.default)}]`);
+			}
+			lines.push(`  ${getLabel(name).padEnd(labelWidth)}  ${option.describe}  ${notes.join(' ')}`);
+		}
+	}
+	return lines.join('\n');
+}
 
 // Gets the file names from argv.
-const rcmFile = argv._[0];
-let   smfFile = argv._[1];
+const rcmFile = positionals[0];
+let   smfFile = positionals[1];
 if (!smfFile) {
 	// If the destination file name is not specify, makes it from the source file name.
 	const p = path.parse(rcmFile);
@@ -200,13 +266,7 @@ if (!smfFile) {
 	smfFile = path.format(p);
 }
 
-// Extracts properties which have camel-case name as a settings.
-const settings = Object.keys(argv).filter((e) => /^[a-zA-Z0-9]+$/u.test(e)).reduce((p, c) => {
-	p[c] = argv[c];
-	return p;
-}, {});
-
-console.assert = (argv.debug) ? assert : () => {/* EMPTY */};
+console.assert = (settings.debug) ? assert : () => {/* EMPTY */};
 
 const readFileAsync  = util.promisify(fs.readFile);
 const writeFileAsync = util.promisify(fs.writeFile);
