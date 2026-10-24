@@ -22,6 +22,26 @@ function readFileAsync(file) {
 	});
 }
 
+// Decodes a text in RCM files, and replaces the user-defined characters of PC-98 Recomposer (EC55h-EC92h) with similar Unicode characters.
+const decodeRcmText = (() => {
+	// Logo (EC55h-EC65h): Each character holds a part of "RECOMPOSER V2.5" or "©COME ON MUSIC".
+	const logoTexts = ['R', 'ECO', 'MP', 'OS', 'ER ', 'V2', '.5', '©', 'C', 'O', 'M', 'E ', 'ON', ' M', 'U', 'SI', 'C'];
+
+	// Notes (EC66h-EC82h): 64th to whole notes, and each of them has plain, triplet, dotted, and double-dotted forms.
+	// The dots are U+1D16D (combining augmentation dot), though some fonts do not place it well.
+	const noteChars = ['\u{1d163}', '\u{1d162}', '\u{1d161}', '\u{1d160}', '\u{1d15f}', '\u{1d15e}', '\u{1d15d}'];
+	const noteTexts = noteChars.flatMap((e) => [e, `³${e}`, `${e}\u{1d16d}`, `${e}\u{1d16d}\u{1d16d}`]);
+
+	// Level meter (EC83h-EC92h): 16 levels are rounded to 8 levels of the block elements.
+	const meterTexts = [...Array(16).keys()].map((i) => String.fromCodePoint(0x2581 + Math.floor(i / 2)));
+
+	const allTexts = [...logoTexts, ...noteTexts, ...meterTexts];
+	console.assert(allTexts.length === 0xe90d - 0xe8d1 + 1, 'Invalid table');
+
+	// decodeNec932() maps the PC-98 user-defined characters (EB40h-EFFCh) to U+E800-U+EBAB, and EC55h is U+E8D1.
+	return (bytes) => decodeNec932(bytes).replace(/[\ue800-\uebab]/gu, (e) => allTexts[e.codePointAt(0) - 0xe8d1] || '\ufffd');
+})();
+
 const makeEventLists = (() => {
 	const ctrlNames = {
 		  0: 'PG.BANK',
@@ -153,7 +173,7 @@ const makeEventLists = (() => {
 				const value = ((hh << 7) | ll) - 8192;
 				return String(value).padStart(9);
 			},
-			strP: (values) => decodeNec932(new Uint8Array(values)),
+			strP: (values) => decodeRcmText(new Uint8Array(values)),
 		};
 
 		return (strings, ...keys) => (event) => {
@@ -620,7 +640,7 @@ document.addEventListener('DOMContentLoaded', () => {
 		elemRcmPage.appendChild(makeElementFromTemplateId('my-rcmFile'));
 
 		// Title
-		elemRcmPage.querySelector('.my-title').textContent = decodeNec932(rcm.header.title);
+		elemRcmPage.querySelector('.my-title').textContent = decodeRcmText(rcm.header.title);
 
 		// File name
 		const elemRcmSmfFileName = elemRcmPage.querySelector('.my-rcmSmfFileName');
@@ -656,13 +676,13 @@ document.addEventListener('DOMContentLoaded', () => {
 		['MTD', 'CM6', 'GSD', 'GSD2'].forEach((key) => {
 			const fileName = `fileName${key}`;
 			if (rcm.header[fileName]) {
-				elemRcmPage.querySelector(`.my-fileName${key}`).textContent = decodeNec932(rcm.header[fileName]);
+				elemRcmPage.querySelector(`.my-fileName${key}`).textContent = decodeRcmText(rcm.header[fileName]);
 			}
 		});
 
 		// Memo area
 		if (rcm.header.memoLines && rcm.header.memoLines.length) {
-			elemRcmPage.querySelector('.my-memoArea').textContent = rcm.header.memoLines.map((e) => decodeNec932(e)).join('\n');
+			elemRcmPage.querySelector('.my-memoArea').textContent = rcm.header.memoLines.map((e) => decodeRcmText(e)).join('\n');
 		}
 
 		// User SysEx
@@ -675,7 +695,7 @@ document.addEventListener('DOMContentLoaded', () => {
 					<tr>
 						<th class="text-center align-middle">${i}</th>
 						<td>
-							<h3 class="h6 mb-0">${decodeNec932(userSysEx.memo)}</h3>
+							<h3 class="h6 mb-0">${decodeRcmText(userSysEx.memo)}</h3>
 							<code>${[...userSysEx.bytes].map((e) => table[e] || e.toString(16).padStart(2, '0')).join(' ')}</code>
 						</td>
 					</tr>`);
@@ -689,7 +709,7 @@ document.addEventListener('DOMContentLoaded', () => {
 		for (const track of rcm.tracks) {
 			// Table
 			const trackNo = ('trackNo' in track) ? track.trackNo : trackId;
-			const trackMemo = (track.memo) ? decodeNec932(track.memo) : '';
+			const trackMemo = (track.memo) ? decodeRcmText(track.memo) : '';
 			elemRcmPage.querySelector('.my-tracks').insertAdjacentHTML('beforeend', `
 				<tr>
 					<td class="text-end">${trackNo}</td>
