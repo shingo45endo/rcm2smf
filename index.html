@@ -22,6 +22,12 @@ function readFileAsync(file) {
 	});
 }
 
+// Escapes a text to embed it in HTML.
+function escapeHtml(text) {
+	const table = {'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', '\'': '&#39;'};
+	return text.replace(/[&<>"']/gu, (e) => table[e]);
+}
+
 // Decodes a text in RCM files, and replaces the user-defined characters of PC-98 Recomposer (EC55h-EC92h) with similar Unicode characters.
 const decodeRcmText = (() => {
 	// Logo (EC55h-EC65h): Each character holds a part of "RECOMPOSER V2.5" or "©COME ON MUSIC".
@@ -464,10 +470,10 @@ document.addEventListener('DOMContentLoaded', () => {
 			console[kind] = (...args) => {
 				const mes = args.join('');
 				elemLog.textContent = `${kind}: ${mes}`;
-				elemLogs.insertAdjacentHTML('beforeend', `<li>${mes}</li>`);
+				elemLogs.insertAdjacentHTML('beforeend', `<li>${escapeHtml(mes)}</li>`);
 
 				if (kind === 'error') {
-					elemErrors.insertAdjacentHTML('beforeend', `<li>${mes}</li>`);
+					elemErrors.insertAdjacentHTML('beforeend', `<li>${escapeHtml(mes)}</li>`);
 					(new bootstrap.Modal(document.getElementById('my-errorModal'))).show();
 				}
 
@@ -569,7 +575,7 @@ document.addEventListener('DOMContentLoaded', () => {
 		// Adds a new tab and a new pane.
 		document.getElementById('my-fileTabs').insertAdjacentHTML('beforeend', `
 			<li class="nav-item">
-				<a id="${tabId}" class="nav-link" href="#${paneId}" role="tab" data-bs-toggle="tab">${name}</a>
+				<a id="${tabId}" class="nav-link" href="#${paneId}" role="tab" data-bs-toggle="tab">${escapeHtml(name)}</a>
 			</li>`);
 		document.getElementById('my-filePanes').insertAdjacentHTML('beforeend', `<div id="${paneId}" class="tab-pane fade" role="tabpanel"></div>`);
 
@@ -695,7 +701,7 @@ document.addEventListener('DOMContentLoaded', () => {
 					<tr>
 						<th class="text-center align-middle">${i}</th>
 						<td>
-							<h3 class="h6 mb-0">${decodeRcmText(userSysEx.memo)}</h3>
+							<h3 class="h6 mb-0">${escapeHtml(decodeRcmText(userSysEx.memo))}</h3>
 							<code>${[...userSysEx.bytes].map((e) => table[e] || e.toString(16).padStart(2, '0')).join(' ')}</code>
 						</td>
 					</tr>`);
@@ -717,7 +723,7 @@ document.addEventListener('DOMContentLoaded', () => {
 					<td class="text-end">${(track.midiCh >= 0) ? track.midiCh + 1 : 'Off'}</td>
 					<td class="text-end">${('stShift' in track) ? track.stShift : 0}</td>
 					<td class="text-end">${(!('keyShift' in track) || (track.keyShift & 0x80) !== 0) ? 0 : track.keyShift - ((track.keyShift >= 0x40) ? 0x80 : 0)}</td>
-					<td style="text-overflow: ellipsis">${trackMemo}</td>
+					<td style="text-overflow: ellipsis">${escapeHtml(trackMemo)}</td>
 				</tr>`);
 
 			// Tabs
@@ -850,7 +856,7 @@ document.addEventListener('DOMContentLoaded', () => {
 				<tr class="${(isRedundant) ? 'table-secondary text-muted' : ''}">
 					<th style="width: 15rem;">
 						${addrStr}
-						${timbreHtml}
+						${escapeHtml(timbreHtml)}
 					</th>
 					<td>
 						<pre class="my-sysEx mb-0"><code>${hexStr}</code></pre>
