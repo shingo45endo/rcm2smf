@@ -41,9 +41,18 @@ function isPc98DependentChars(cp932code) {
 	return (0x8540 <= cp932code && cp932code <= 0x86ff);
 }
 
+// PC-98 user-defined characters (JIS rows 85-94, lead byte EBh-EFh) that have no mapping in CP932.
+function isPc98UserDefinedChars(cp932code) {
+	const trailByte = cp932code & 0xff;
+	if (!(0xeb00 <= cp932code && cp932code <= 0xefff) || !((0x40 <= trailByte && trailByte <= 0x7e) || (0x80 <= trailByte && trailByte <= 0xfc))) {
+		return false;
+	}
+	return (decoder.decode(new Uint8Array([cp932code >> 8, trailByte])).codePointAt(0) === 0xfffd);
+}
+
 export function decodeNec932(bytes) {
-	// Checks whether the bytes seem to contain PC-98 dependent characters.
-	if ([...bytes].some((e, i, a) => (i > 0) && isPc98DependentChars((a[i - 1] << 8) | e))) {	// It allows false positive.
+	// Checks whether the bytes seem to contain PC-98 dependent or user-defined characters.
+	if ([...bytes].some((e, i, a) => (i > 0) && (isPc98DependentChars((a[i - 1] << 8) | e) || isPc98UserDefinedChars((a[i - 1] << 8) | e)))) {	// It allows false positive.
 		// Separates from the bytes to each character code according to Shift_JIS encoding.
 		let leadingByte = -1;
 		const charArrays = [...bytes].reduce((p, c) => {
@@ -71,6 +80,10 @@ export function decodeNec932(bytes) {
 				return String.fromCodePoint(cp932code + 0x79c2);
 			} else if (0x8540 <= cp932code && cp932code <= 0x859e) {	// PC-98 dependent multi-byte half-width JIS X 0201
 				return String.fromCodePoint(cp932code - 0x851f);
+			} else if (isPc98UserDefinedChars(cp932code)) {	// PC-98 user-defined character (JIS rows 85-94 to U+E800-U+EBAB)
+				// U+E000-U+E757 is not used because TextDecoder maps the CP932 user-defined characters (F040h-F9FCh) to it.
+				const trailByte = cp932code & 0xff;
+				return String.fromCodePoint(0xe800 + ((cp932code >> 8) - 0xeb) * 188 + trailByte - ((trailByte < 0x80) ? 0x40 : 0x41));
 			} else {
 				return decoder.decode(new Uint8Array(e));
 			}
