@@ -344,7 +344,13 @@ export function parseMcp(buf) {
 	// Header
 	rcm.header.title = buf.slice(0x02, 0x20);
 
+	// Checks the time base, because the header ID alone also matches many other files.
+	// It must be 24 or one of the internal time bases of MPU-401.
 	rcm.header.timeBase = view.getUint8(0x20);
+	if (![24, 48, 72, 96, 120, 144, 168, 192].includes(rcm.header.timeBase)) {
+		return null;
+	}
+
 	rcm.header.tempo    = view.getUint8(0x21);
 	rcm.header.beatN    = view.getUint8(0x22);
 	rcm.header.beatD    = view.getUint8(0x23);
@@ -364,6 +370,11 @@ export function parseMcp(buf) {
 		}
 		return track;
 	});
+
+	// Checks the MIDI channels for the same reason as the time base. Each must be 0-15 or OFF (-1).
+	if (!rcm.tracks.slice(1).every((track) => ((track.midiCh >= 0 && track.midiCh < 16) || track.midiCh === -1))) {
+		return null;
+	}
 
 	// All events
 	const events = buf.slice(0x0100).reduce((p, _, i, a) => {
