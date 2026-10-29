@@ -847,7 +847,7 @@ document.addEventListener('DOMContentLoaded', () => {
 				timbreHtml = `
 					<div class="card bg-light mt-2">
 						<div class="card-body py-1">
-							I${String(timbreNo).padStart(2, '0')}: <pre class="my-0">${timbreName}</pre>
+							I${String(timbreNo).padStart(2, '0')}: <pre class="my-0">${escapeHtml(timbreName)}</pre>
 						</div>
 					</div>`;
 			}
@@ -856,7 +856,7 @@ document.addEventListener('DOMContentLoaded', () => {
 				<tr class="${(isRedundant) ? 'table-secondary text-muted' : ''}">
 					<th style="width: 15rem;">
 						${addrStr}
-						${escapeHtml(timbreHtml)}
+						${timbreHtml}
 					</th>
 					<td>
 						<pre class="my-sysEx mb-0"><code>${hexStr}</code></pre>
