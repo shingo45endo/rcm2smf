@@ -326,6 +326,7 @@ export function parseMcp(buf) {
 	const rcm = {header: {isMCP: true, maxTracks: 1 + 8 + 1}, tracks: []};
 
 	// Header
+	rcm.header.id    = id;
 	rcm.header.title = buf.slice(0x02, 0x20);
 
 	// Checks the time base, because the header ID alone also matches many other files.
@@ -335,10 +336,13 @@ export function parseMcp(buf) {
 		return null;
 	}
 
-	rcm.header.tempo    = view.getUint8(0x21);
-	rcm.header.beatN    = view.getUint8(0x22);
-	rcm.header.beatD    = view.getUint8(0x23);
-	rcm.header.key      = convertKeyMcpToRcp(view.getUint8(0x24));
+	rcm.header.tempo  = view.getUint8(0x21);
+	rcm.header.beatN  = view.getUint8(0x22);
+	rcm.header.beatD  = view.getUint8(0x23);
+	rcm.header.rawKey = view.getUint8(0x24);
+	rcm.header.key    = convertKeyMcpToRcp(rcm.header.rawKey);
+
+	rcm.header.busModes = [...buf.slice(0x30, 0x40)];
 
 	if (buf[0x60] !== 0x00 && buf[0x60] !== 0x20) {
 		rcm.header.fileNameMTD = new Uint8Array([...rawTrim(rawTrimNul(buf.slice(0x60, 0x66))), '.'.codePointAt(), ...rawTrim(rawTrimNul(buf.slice(0x66, 0x69)))]);
@@ -410,7 +414,8 @@ export function parseRcp(buf) {
 	}
 
 	// Checks the file header.
-	if (buf.length < 518 || !String.fromCharCode(...buf.slice(0x0000, 0x0020)).startsWith('RCM-PC98V2.0(C)COME ON MUSIC')) {
+	const id = buf.slice(0x0000, 0x0020);
+	if (buf.length < 518 || !String.fromCharCode(...id).startsWith('RCM-PC98V2.0(C)COME ON MUSIC')) {
 		return null;
 	}
 
@@ -418,8 +423,10 @@ export function parseRcp(buf) {
 	const rcm = {header: {}, tracks: []};
 
 	// Header
-	rcm.header.title = buf.slice(0x0020, 0x0060);
+	rcm.header.id        = id;
+	rcm.header.title     = buf.slice(0x0020, 0x0060);
 	rcm.header.memoLines = [...new Array(12)].map((_, i) => buf.slice(0x0060 + 28 * i, 0x0060 + 28 * (i + 1)));
+	rcm.header.busModes  = [...buf.slice(0x01b0, 0x01c0)];
 
 	rcm.header.timeBase = (view.getUint8(0x01e7) << 8) | view.getUint8(0x01c0);
 	rcm.header.tempo    = view.getUint8(0x01c1);
@@ -432,8 +439,21 @@ export function parseRcp(buf) {
 	rcm.header.fileNameGSD = rawTrim(rawTrimNul(buf.slice(0x01d6, 0x01e6)));
 
 	const trackNum = view.getUint8(0x01e6);
+	rcm.header.rawTrackNum = trackNum;
 	rcm.header.maxTracks = (trackNum === 0) ? 18 : trackNum;
 	rcm.header.isF = (trackNum !== 0);
+
+	// The lower 4 bits are for MPU and the upper 4 bits are for RS. Each value is the number of TONENAME.TB? - 1.
+	rcm.header.toneFileNos = [...buf.slice(0x01f6, 0x0206)];
+
+	rcm.header.rhythmAssigns = [...new Array(32)].map((_, i) => {
+		const index = 0x0206 + 16 * i;
+		return {
+			name:     buf.slice(index, index + 14),
+			noteNo:   view.getUint8(index + 14),
+			gateTime: view.getUint8(index + 15),
+		};
+	});
 
 	rcm.header.userSysExs = [...new Array(8)].map((_, i) => {
 		const index = 0x0406 + 48 * i;
@@ -461,14 +481,16 @@ export function parseRcp(buf) {
 			console.warn(`Invalid track size: ${size}`);
 			break;
 		}
+		track.rawBlockSize = size;
 
-		track.trackNo  = view.getUint8(index + 2);
-		track.midiCh   = view.getInt8(index + 4);
-		track.keyShift = view.getUint8(index + 5);
-		track.stShiftS = view.getInt8(index + 6);
-		track.stShiftU = view.getUint8(index + 6);
-		track.mode     = view.getUint8(index + 7);
-		track.memo     = buf.slice(index + 8, index + 44);
+		track.trackNo   = view.getUint8(index + 2);
+		track.trackType = view.getUint8(index + 3);
+		track.midiCh    = view.getInt8(index + 4);
+		track.keyShift  = view.getUint8(index + 5);
+		track.stShiftS  = view.getInt8(index + 6);
+		track.stShiftU  = view.getUint8(index + 6);
+		track.mode      = view.getUint8(index + 7);
+		track.memo      = buf.slice(index + 8, index + 44);
 
 		// Track events
 		let events = buf.slice(index + HEADER_LENGTH, index + size).reduce((p, _, i, a) => {
@@ -516,6 +538,9 @@ export function parseRcp(buf) {
 		index += size;
 	}
 
+	// Data after the last track, such as a trailer written by the Windows version or an official converter.
+	rcm.trailer = buf.slice(index);
+
 	// Sets ST+ for each track.
 	const isStSigned = rcm.header.isF || rcm.tracks.every((track) => (-99 <= track.stShiftS && track.stShiftS <= 99));
 	rcm.tracks.forEach((track) => {
@@ -532,7 +557,8 @@ export function parseG36(buf) {
 	}
 
 	// Checks the file header.
-	if (buf.length < 518 || !String.fromCharCode(...buf.slice(0x0000, 0x0020)).startsWith('COME ON MUSIC RECOMPOSER RCP3.0')) {
+	const id = buf.slice(0x0000, 0x0020);
+	if (buf.length < 518 || !String.fromCharCode(...id).startsWith('COME ON MUSIC RECOMPOSER RCP3.0')) {
 		return null;
 	}
 
@@ -540,7 +566,9 @@ export function parseG36(buf) {
 	const rcm = {header: {isG: true}, tracks: []};
 
 	// Header
-	rcm.header.title = buf.slice(0x0020, 0x0060);
+	rcm.header.id        = id;
+	rcm.header.title     = buf.slice(0x0020, 0x0060);
+	rcm.header.copyright = buf.slice(0x0060, 0x00a0);
 	rcm.header.memoLines = [...new Array(12)].map((_, i) => buf.slice(0x00a0 + 30 * i, 0x00a0 + 30 * (i + 1)));
 
 	rcm.header.maxTracks = view.getUint16(0x0208, true);
@@ -551,9 +579,32 @@ export function parseG36(buf) {
 	rcm.header.key       = view.getUint8(0x0210);
 	rcm.header.playBias  = view.getInt8(0x0211);
 
+	rcm.header.smpteOffset = {
+		frameRate: view.getUint8(0x0212),	// 0: 24, 1: 25, 2: 30 drop, 3: 30 non-drop
+		hour:      view.getUint8(0x0213),
+		minute:    view.getUint8(0x0214),
+		second:    view.getUint8(0x0215),
+		frame:     view.getUint8(0x0216),
+		bit:       view.getUint8(0x0217),
+	};
+	rcm.header.busModes = [...buf.slice(0x0218, 0x0228)];
+
 	rcm.header.fileNameCM6  = rawTrim(rawTrimNul(buf.slice(0x0298, 0x02a8)));
 	rcm.header.fileNameGSD  = rawTrim(rawTrimNul(buf.slice(0x02a8, 0x02b8)));
 	rcm.header.fileNameGSD2 = rawTrim(rawTrimNul(buf.slice(0x02b8, 0x02c8)));
+
+	// Positions remembered by the locate buttons 1-4 of the Windows version. 0 means not set.
+	rcm.header.locatePositions = [...new Array(4)].map((_, i) => view.getUint32(0x02f8 + 4 * i, true));
+
+	// 4 blocks of 32 instruments in a row.
+	rcm.header.rhythmAssigns = [...new Array(128)].map((_, i) => {
+		const index = 0x0318 + 16 * i;
+		return {
+			name:     buf.slice(index, index + 14),
+			noteNo:   view.getUint8(index + 14),
+			gateTime: view.getUint8(index + 15),
+		};
+	});
 
 	rcm.header.userSysExs = [...new Array(8)].map((_, i) => {
 		const index = 0x0b18 + 48 * i;
@@ -581,13 +632,15 @@ export function parseG36(buf) {
 			console.warn(`Invalid track size: ${size}`);
 			break;
 		}
+		track.rawBlockSize = size;
 
-		track.trackNo  = view.getUint8(index + 4);
-		track.midiCh   = view.getInt8(index + 6);
-		track.keyShift = view.getUint8(index + 7);
-		track.stShift  = view.getInt8(index + 8);
-		track.mode     = view.getUint8(index + 9);
-		track.memo     = buf.slice(index + 10, index + 46);
+		track.trackNo   = view.getUint8(index + 4);
+		track.trackType = view.getUint8(index + 5);
+		track.midiCh    = view.getInt8(index + 6);
+		track.keyShift  = view.getUint8(index + 7);
+		track.stShift   = view.getInt8(index + 8);
+		track.mode      = view.getUint8(index + 9);
+		track.memo      = buf.slice(index + 10, index + 46);
 
 		// Track events
 		track.events = buf.slice(index + HEADER_LENGTH, index + size).reduce((p, _, i, a) => {
@@ -601,6 +654,9 @@ export function parseG36(buf) {
 
 		index += size;
 	}
+
+	// Data after the last track, such as a trailer written by the Windows version.
+	rcm.trailer = buf.slice(index);
 
 	return rcm;
 }
